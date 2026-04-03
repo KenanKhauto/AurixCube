@@ -10,3 +10,6 @@ email-validator
 itsdangerous
 psycopg[binary]
 redis
+sentence-transformers
+rapidfuzz
+torch

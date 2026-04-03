@@ -12,6 +12,7 @@ from app.games.who_am_i.constants import CATEGORIES
 from app.games.who_am_i.domain import WhoAmIPlayer, WhoAmIRoom
 from app.repositories.room_repository import RoomRepository
 from app.services.room_storage import get_room_repository
+from app.core.guess_matcher import is_correct_guess
 
 
 class WhoAmIService:
@@ -123,7 +124,7 @@ class WhoAmIService:
         random.shuffle(identities_pool)
 
         for index, player in enumerate(room.players.values()):
-            player.identity = identities_pool[index]
+            player.identity = identities_pool[index]["label"]
             player.has_guessed_correctly = False
             player.guess_count = 0
             player.solved_order = None
@@ -258,10 +259,20 @@ class WhoAmIService:
 
         player.guess_count += 1
 
-        normalized_guess = guess_text.strip().casefold()
-        normalized_identity = player.identity.strip().casefold()
+        category_entries = CATEGORIES[room.category]
+        target_entry = next(
+            (entry for entry in category_entries if entry["label"] == player.identity),
+            None,
+        )
 
-        if normalized_guess == normalized_identity:
+        if target_entry is None:
+            raise ValueError("Target identity entry not found.")
+
+        if is_correct_guess(
+            guess=guess_text,
+            target_label=target_entry["label"],
+            aliases=target_entry.get("aliases", []),
+        ):
             player.has_guessed_correctly = True
             room.solve_counter += 1
             player.solved_order = room.solve_counter

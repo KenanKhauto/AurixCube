@@ -10,7 +10,7 @@ from app.db.init_db import init_db
 from app.web.router import router as web_router
 from app.games.undercover.router import router as undercover_router
 from app.games.who_am_i.router import router as who_am_i_router
-
+from app.core.guess_matcher import preload_embedding_model
 
 
 app = FastAPI(title=settings.app_name, debug=settings.debug)
@@ -33,3 +33,4 @@ def on_startup() -> None:
     Initialize application resources on startup.
     """
     init_db()
+    preload_embedding_model()
