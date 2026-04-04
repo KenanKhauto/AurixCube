@@ -2,12 +2,12 @@
 
 GAMES = [
     {
-        "id": "future_game",
+        "id": "bluff",
         "name": "لعبتنا 🪐",
         "description": "لعبة الأسئلة والخداع الكبرى",
-        "path": "#",
-        "coming_soon": True,
-        "disabled": True,
+        "path": "/games/bluff",
+        "coming_soon": False,
+        "disabled": False,
     },
     {
         "id": "undercover",

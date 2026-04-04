@@ -111,3 +111,19 @@ def who_am_i_page(
             "current_user": current_user,
         },
     )
+
+
+@router.get("/games/bluff")
+def bluff_page(
+    request: Request,
+    current_user: User | None = Depends(get_current_user_optional),
+):
+    """Render the Bluff game page."""
+    return templates.TemplateResponse(
+        request,
+        "bluff.html",
+        {
+            "request": request,
+            "current_user": current_user,
+        },
+    )
