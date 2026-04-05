@@ -232,6 +232,7 @@ body::before {
     transition: 0.2s;
     margin: 8px 0;
     font-size: 16px;
+    box-sizing: border-box;
 }
 
 .btn:hover {
@@ -289,9 +290,10 @@ select {
     border: 1px solid #444;
     padding: 10px;
     border-radius: 8px;
-    width: 90%;
+    width: 100%;
     margin: 8px 0;
     text-align: center;
+    box-sizing: border-box;
 }
 
 /* ================= LINKS ================= */
@@ -464,6 +466,47 @@ select {
     box-shadow: 0 0 24px rgba(118, 126, 4, 0.22);
 }
 
+.game-title-box {
+    display: flex;
+    flex-direction: column; /* stack logo above text */
+    align-items: center;
+    justify-content: center;
+
+    width: fit-content; /* shrink to content */
+    margin: 0 auto 20px; /* center horizontally */
+
+    background: rgba(20, 20, 20, 0.9);
+    border-radius: 14px;
+    padding: 14px 22px;
+
+    border: 1px solid var(--border);
+}
+
+.game-title-logo {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    margin-bottom: 6px; /* space between logo & text */
+}
+
+.game-title-text {
+    font-size: 22px;
+    font-weight: bold;
+    color: #fff;
+
+    -webkit-text-stroke: 1px var(--primary);
+
+    text-shadow: 0 0 6px rgba(255,255,255,0.05);
+
+    text-align: center;
+}
+
+.game-title-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 14px var(--primary);
+    transition: 0.2s ease;
+}
+
 .cs-tag {
     position: absolute;
     top: 12px;
@@ -533,6 +576,18 @@ select {
 
 .theme-whoami .game-header-logo {
     filter: drop-shadow(0 0 10px #d2d52e);
+}
+
+.theme-whoami .game-title-box {
+    box-shadow: 0 0 12px rgba(210, 213, 46, 0.15);
+}
+
+.theme-bluff .game-title-box {
+    box-shadow: 0 0 12px rgba(71, 215, 255, 0.15);
+}
+
+.theme-undercover .game-title-box {
+    box-shadow: 0 0 12px rgba(56, 255, 30, 0.15);
 }
 
 

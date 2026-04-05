@@ -5,8 +5,10 @@
 {% block content %}
 <div class="{{ theme_class }}">
     <div id="screen-bluff-lobby" class="card glow-border">
-        <img src="/static/images/bluff-logo.png" class="game-header-logo">
-        <h1 style="color:var(--primary); text-shadow: var(--glow);">لعبة الخداع</h1>
+        <div class="game-title-box">
+            <img src="/static/images/bluff-logo.png" class="game-title-logo">
+            <span class="game-title-text">لعبة الخداع</span>
+        </div>
         <input type="text" id="bluffName" placeholder="اسمك المستعار....">
         <button class="btn btn-primary" onclick="showBluffSetup()">إنشاء غرفة جديدة +</button>
         <div style="margin:10px; color:#666">— أو —</div>
