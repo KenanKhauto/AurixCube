@@ -24,9 +24,7 @@ The platform currently includes an Undercover-style game with room creation, joi
 ```bash
 pip install -r requirements.txt
 python run.py
-
-
-## License
+```
 
 ## License
 
