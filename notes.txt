@@ -1,4 +1,4 @@
-- who am I, role order is not correct. Some people are not getting their role until the end.
+- who am I, role order is not correct. Some people are not getting their role until the end. Solved!!!
 
 لعبة Kalak هي لعبة جماعية خفيفة وممتعة بتنعَب مع الأصدقاء، واحد من اللاعبين بينشئ غرفة وبيحدد الإعدادات، وبعدها باقي اللاعبين بيفوتوا وبتبلّش الجولات، وكل لاعب بياخد دوره، ولما يخلص دوره بينتقل الاختيار للي بعده لحتى يشارك الكل، وبالنهاية بتنحسب النقاط حسب الأداء والتفاعل، والهدف يكون أعلى نتيجة بين المجموعة.
 

@@ -7,6 +7,10 @@ let isHost = false;
 let currentGuessDraft = "";
 let lastRoomSnapshot = null;
 let currentPlayerKnowledge = [];
+let selectedCategories = [];
+const MAX_CATEGORIES = 12;
+let selectedPlayerCount = null;
+const playerCountOptions = [2, 3, 4, 5, 6, 7, 8];
 
 const categoryLabels = {
     football_players: "لاعبين كرة قدم ⚽",
@@ -17,6 +21,7 @@ const categoryLabels = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
+    renderPlayerCountButtons();
     await loadCategories();
 
     if (currentPlayerName) {
@@ -32,18 +37,121 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
+function renderPlayerCountButtons() {
+    const container = document.getElementById("playerCountGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    playerCountOptions.forEach((count) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.playerCount = String(count);
+        button.textContent = `${count} لاعبين`;
+
+        if (count === selectedPlayerCount) {
+            button.classList.add("active");
+        }
+
+        button.onclick = () => selectPlayerCount(count);
+
+        container.appendChild(button);
+    });
+}
+
+function selectPlayerCount(count) {
+    selectedPlayerCount = count;
+    updatePlayerCountButtonsState();
+}
+
+function updatePlayerCountButtonsState() {
+    const buttons = document.querySelectorAll("#playerCountGrid .category-btn");
+
+    buttons.forEach((btn) => {
+        const count = Number(btn.dataset.playerCount);
+
+        if (count === selectedPlayerCount) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+    });
+}
+
 async function loadCategories() {
     const response = await fetch("/api/who-am-i/categories");
     const data = await response.json();
 
-    const select = document.getElementById("gameCategory");
-    select.innerHTML = "";
+    const container = document.getElementById("categoryGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
 
     Object.keys(data.categories).forEach((key) => {
-        const option = document.createElement("option");
-        option.value = key;
-        option.textContent = categoryLabels[key] || key;
-        select.appendChild(option);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.categoryKey = key;
+        button.textContent = categoryLabels[key] || key;
+
+        if (selectedCategories.includes(key)) {
+            button.classList.add("active");
+        }
+
+        button.onclick = () => toggleCategory(key);
+
+        container.appendChild(button);
+    });
+
+    updateCategoryButtonsState();
+}
+
+
+function toggleCategory(categoryKey) {
+    const isSelected = selectedCategories.includes(categoryKey);
+
+    if (isSelected) {
+        selectedCategories = selectedCategories.filter((c) => c !== categoryKey);
+    } else {
+        if (selectedCategories.length >= MAX_CATEGORIES) {
+            alert(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
+            return;
+        }
+
+        selectedCategories.push(categoryKey);
+    }
+
+    updateCategoryButtonsState();
+}
+
+function updateCategoryButtonsState() {
+    const buttons = document.querySelectorAll(".category-btn");
+    const info = document.getElementById("categorySelectionInfo");
+
+    if (info) {
+        info.textContent = `تم اختيار ${selectedCategories.length} / ${MAX_CATEGORIES}`;
+    }
+
+    buttons.forEach((btn) => {
+        const key = btn.dataset.categoryKey;
+        if (!key) return;
+
+        const isSelected = selectedCategories.includes(key);
+
+        if (isSelected) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+
+        if (!isSelected && selectedCategories.length >= MAX_CATEGORIES) {
+            btn.classList.add("disabled");
+            btn.disabled = true;
+        } else {
+            btn.classList.remove("disabled");
+            btn.disabled = false;
+        }
     });
 }
 
@@ -69,8 +177,16 @@ function goBackToLobby() {
 
 async function createRoom() {
     const hostName = currentPlayerName || document.getElementById("pName").value.trim();
-    const playerCount = parseInt(document.getElementById("playerCount").value, 10);
-    const category = document.getElementById("gameCategory").value;
+    const playerCount = selectedPlayerCount;
+
+    if (selectedCategories.length === 0) {
+    alert("اختر تصنيفاً واحداً على الأقل!");
+    return;
+    }
+    if (!selectedPlayerCount) {
+        alert("اختر عدد اللاعبين أولاً!");
+        return;
+    }
 
     const response = await fetch("/api/who-am-i/rooms", {
         method: "POST",
@@ -78,10 +194,11 @@ async function createRoom() {
         body: JSON.stringify({
             host_name: hostName,
             player_count: playerCount,
-            category: category
+            categories: selectedCategories
         })
     });
 
+    
     const data = await response.json();
 
     if (!response.ok) {
@@ -252,12 +369,15 @@ async function fetchMySolvedIdentity() {
 }
 
 async function restartGame() {
-    const category = document.getElementById("gameCategory").value;
+    if (selectedCategories.length === 0) {
+    alert("اختر تصنيفاً واحداً على الأقل!");
+    return;
+    }
 
     const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/restart`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ category: category })
+        body: JSON.stringify({ categories: selectedCategories })
     });
 
     const data = await response.json();
@@ -636,6 +756,7 @@ function clearLocalGameState() {
     currentGuessDraft = "";
     lastRoomSnapshot = null;
     currentPlayerKnowledge = [];
+    selectedCategories = [];
 }
 
 function resetAndExit() {

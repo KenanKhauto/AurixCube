@@ -365,3 +365,58 @@ select {
         text-align: right;
     }
 }
+
+
+.category-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 12px 0 18px;
+    justify-content: center;
+}
+
+.category-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    transition: 0.2s ease;
+    box-shadow: 0 0 0 transparent;
+    min-width: 150px;
+    text-align: center;
+}
+
+.category-btn:hover {
+    border-color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.category-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    box-shadow: var(--glow);
+    transform: scale(1.02);
+}
+
+.category-btn.disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    border-color: #2a2a2a;
+    box-shadow: none;
+}
+
+.category-btn:focus {
+    outline: none;
+}
+
+.category-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}

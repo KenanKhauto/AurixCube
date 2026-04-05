@@ -16,18 +16,10 @@
     <h2 style="color:var(--primary)">إعدادات اللعبة</h2>
 
     <label>عدد اللاعبين:</label>
-    <select id="playerCount">
-        <option value="2">2 لاعبين</option>
-        <option value="3">3 لاعبين</option>
-        <option value="4" selected>4 لاعبين</option>
-        <option value="5">5 لاعبين</option>
-        <option value="6">6 لاعبين</option>
-        <option value="7">7 لاعبين</option>
-        <option value="8">8 لاعبين</option>
-    </select>
+    <div id="playerCountGrid" class="category-grid"></div>
 
-    <label>التصنيف:</label>
-    <select id="gameCategory"></select>
+    <label>التصنيفات (اختر حتى 12):</label>
+    <div id="categoryGrid" class="category-grid"></div>
 
     <button class="btn btn-primary" onclick="createRoom()">تأكيد الإعدادات</button>
     <button class="btn" onclick="goBackToLobby()">رجوع</button>

@@ -30,13 +30,20 @@ class WhoAmIService:
         self,
         host_name: str,
         player_count: int,
-        category: str,
+        categories: list[str],
     ) -> WhoAmIRoom:
         """
         Create a new room and add the host as the first player.
         """
-        if category not in CATEGORIES:
-            raise ValueError("Invalid category.")
+        if not categories:
+            raise ValueError("At least one category must be selected.")
+
+        if len(categories) > 12:
+            raise ValueError("You can select up to 12 categories only.")
+
+        invalid_categories = [category for category in categories if category not in CATEGORIES]
+        if invalid_categories:
+            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
 
         room_code = generate_room_code()
         host_id = str(uuid.uuid4())
@@ -44,7 +51,7 @@ class WhoAmIService:
         room = WhoAmIRoom(
             room_code=room_code,
             host_id=host_id,
-            category=category,
+            categories=categories,
             player_count=player_count,
         )
         room.players[host_id] = WhoAmIPlayer(id=host_id, name=host_name)
@@ -117,7 +124,9 @@ class WhoAmIService:
         if len(room.players) != room.player_count:
             raise ValueError("Room is not full yet.")
 
-        identities_pool = CATEGORIES[room.category][:]
+        identities_pool = []
+        for category in room.categories:
+            identities_pool.extend(CATEGORIES[category])
         if len(identities_pool) < len(room.players):
             raise ValueError("Not enough identities in selected category.")
 
@@ -259,9 +268,12 @@ class WhoAmIService:
 
         player.guess_count += 1
 
-        category_entries = CATEGORIES[room.category]
+        all_entries = []
+        for category in room.categories:
+            all_entries.extend(CATEGORIES[category])
+
         target_entry = next(
-            (entry for entry in category_entries if entry["label"] == player.identity),
+            (entry for entry in all_entries if entry["label"] == player.identity),
             None,
         )
 
@@ -290,16 +302,23 @@ class WhoAmIService:
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
-    def restart_game(self, room_code: str, category: str) -> WhoAmIRoom:
+    def restart_game(self, room_code: str, categories: list[str]) -> WhoAmIRoom:
         """
         Restart the room with the same players and a new category.
         """
         room = self._get_room(room_code)
+        categories = list(dict.fromkeys(categories))
+        if not categories:
+            raise ValueError("At least one category must be selected.")
 
-        if category not in CATEGORIES:
-            raise ValueError("Invalid category.")
+        if len(categories) > 12:
+            raise ValueError("You can select up to 12 categories only.")
 
-        room.category = category
+        invalid_categories = [category for category in categories if category not in CATEGORIES]
+        if invalid_categories:
+            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
+
+        room.categories = categories
         room.started = False
         room.ended = False
 
@@ -380,7 +399,7 @@ class WhoAmIService:
         return {
             "room_code": room.room_code,
             "host_id": room.host_id,
-            "category": room.category,
+            "categories": room.categories,
             "player_count": room.player_count,
             "started": room.started,
             "ended": room.ended,
@@ -412,7 +431,7 @@ class WhoAmIService:
         room = WhoAmIRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],
-            category=data["category"],
+            categories=data.get("categories", []),
             player_count=data["player_count"],
             started=data["started"],
             ended=data["ended"],
