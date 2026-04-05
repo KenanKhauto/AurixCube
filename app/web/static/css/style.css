@@ -105,6 +105,82 @@ body::before {
     font-size: 15px;
     transition: 0.2s;
 }
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* icon style */
+.nav-link i {
+    font-size: 14px;
+    opacity: 0.85;
+}
+
+/* active state (you already have this, but enhance it) */
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: #ccc;
+    font-size: 15px;
+    transition: 0.2s;
+    position: relative;
+    padding-bottom: 8px;
+}
+
+.nav-link i {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.nav-link:hover,
+.nav-link.active-nav {
+    color: var(--primary);
+}
+
+.nav-link:hover i,
+.nav-link.active-nav i {
+    color: var(--primary);
+}
+
+.mobile-menu a.active-nav {
+    color: var(--primary);
+    background: #1a1a1a;
+    font-weight: bold;
+}
+
+.nav-indicator {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    height: 2px;
+    width: 0;
+    background: var(--primary);
+    box-shadow: var(--glow);
+    border-radius: 999px;
+    transition: right 0.25s ease, width 0.25s ease, opacity 0.2s ease;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* optional: subtle hover */
+.nav-link:hover i {
+    transform: translateY(-1px);
+    transition: 0.2s;
+}
+
+.nav-link i {
+    color: var(--primary);
+}
 
 .nav-link:hover {
     color: var(--primary);
@@ -135,17 +211,6 @@ body::before {
     color: var(--primary);
     position: relative;
     font-weight: bold;
-}
-
-.nav-link.active-nav::after {
-    content: "";
-    position: absolute;
-    bottom: -6px;
-    right: 0;
-    width: 100%;
-    height: 2px;
-    background: var(--primary);
-    box-shadow: var(--glow);
 }
 
 .mobile-menu a.active-nav {

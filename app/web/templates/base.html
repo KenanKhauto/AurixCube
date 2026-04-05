@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}بوابة الألعاب{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
 
@@ -15,29 +16,43 @@
              ArcadiaHub
         </div>
 
-        <nav class="nav-links">
-            <a href="/" class="nav-link {% if request.url.path == '/' %}active-nav{% endif %}">الرئيسية</a>
-            <a href="/games" class="nav-link {% if request.url.path.startswith('/games') %}active-nav{% endif %}">الألعاب</a>
-            <a href="/about" class="nav-link {% if request.url.path == '/about' %}active-nav{% endif %}">حول</a>
+        <nav class="nav-links" id="desktopNav">
+            <a href="/" class="nav-link {% if request.url.path == '/' %}active-nav{% endif %}">
+                 الرئيسية <i class="fas fa-house"></i>
+            </a>
+
+            <a href="/games" class="nav-link {% if request.url.path.startswith('/games') %}active-nav{% endif %}">
+                 الألعاب <i class="fas fa-gamepad"></i>
+            </a>
+
+            <a href="/about" class="nav-link {% if request.url.path == '/about' %}active-nav{% endif %}">
+                 حول <i class="fas fa-circle-info"></i>
+            </a>
 
             {% if request.session.get("user_id") %}
                 <a href="/profile" class="nav-link {% if request.url.path == '/profile' %}active-nav{% endif %}">
+                    
                     <span class="nav-user">
                         أهلاً، {{ current_user.display_name or current_user.username }}
                     </span>
+                    <i class="fas fa-user"></i>
                 </a>
             {% else %}
-                <a href="/login" class="nav-link {% if request.url.path == '/login' %}active-nav{% endif %}">تسجيل الدخول</a>
+                <a href="/login" class="nav-link {% if request.url.path == '/login' %}active-nav{% endif %}">
+                     تسجيل الدخول <i class="fas fa-right-to-bracket"></i>
+                </a>
             {% endif %}
+
+            <span class="nav-indicator" id="navIndicator"></span>
         </nav>
 
         <div class="menu-toggle" onclick="toggleMenu()">☰</div>
     </div>
 
     <div id="mobileMenu" class="mobile-menu hidden">
-        <a href="/" class="{% if request.url.path == '/' %}active-nav{% endif %}">الرئيسية</a>
-        <a href="/games" class="{% if request.url.path.startswith('/games') %}active-nav{% endif %}">الألعاب</a>
-        <a href="/about" class="{% if request.url.path == '/about' %}active-nav{% endif %}">حول</a>
+        <a href="/" class="{% if request.url.path == '/' %}active-nav{% endif %}"> الرئيسية</a>
+        <a href="/games" class="{% if request.url.path.startswith('/games') %}active-nav{% endif %}"> الألعاب</a>
+        <a href="/about" class="{% if request.url.path == '/about' %}active-nav{% endif %}"> حول</a>
 
         {% if request.session.get("user_id") %}
             <a href="/profile" class="{% if request.url.path == '/profile' %}active-nav{% endif %}">
@@ -76,6 +91,51 @@ function toggleMenu() {
 function goHome() {
     window.location.href = "/";
 }
+
+function setupNavIndicator() {
+    const nav = document.getElementById("desktopNav");
+    const indicator = document.getElementById("navIndicator");
+    if (!nav || !indicator) return;
+
+    const links = nav.querySelectorAll(".nav-link");
+    const activeLink = nav.querySelector(".nav-link.active-nav");
+
+    function moveIndicator(target) {
+        if (!target) {
+            indicator.style.opacity = "0";
+            indicator.style.width = "0px";
+            return;
+        }
+
+        const navRect = nav.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+
+        const rightOffset = navRect.right - targetRect.right;
+
+        indicator.style.width = `${targetRect.width}px`;
+        indicator.style.right = `${rightOffset}px`;
+        indicator.style.opacity = "1";
+    }
+
+    if (activeLink) {
+        moveIndicator(activeLink);
+    }
+
+    links.forEach((link) => {
+        link.addEventListener("mouseenter", () => moveIndicator(link));
+    });
+
+    nav.addEventListener("mouseleave", () => {
+        moveIndicator(activeLink);
+    });
+
+    window.addEventListener("resize", () => {
+        const currentActive = nav.querySelector(".nav-link.active-nav");
+        moveIndicator(currentActive);
+    });
+}
+
+document.addEventListener("DOMContentLoaded", setupNavIndicator);
 </script>
 
 </body>
