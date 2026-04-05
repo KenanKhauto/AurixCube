@@ -34,6 +34,10 @@ const bluffCategoryLabels = {
     general: "معلومات عامة",
     strange_facts: "معلومات غريبة",
     islam: "إسلاميات",
+    history: "تاريخ"
+    animals: "حيوانات"
+    proverbs: "أمثال شامية"
+    player career: "مسيرة لاعب"
 
 };
 
