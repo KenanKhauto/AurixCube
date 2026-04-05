@@ -25,7 +25,7 @@ class BluffAnswerOption:
 class BluffRoom:
     room_code: str
     host_id: str
-    category: str
+    categories: list[str]
     player_count: int
     total_rounds: int
 

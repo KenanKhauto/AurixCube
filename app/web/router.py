@@ -87,12 +87,15 @@ def undercover_page(
     current_user: User | None = Depends(get_current_user_optional),
 ):
     """Render the Undercover game page."""
+    game = next((game for game in GAMES if game["path"] == "/games/undercover"), {})
+
     return templates.TemplateResponse(
         request,
         "undercover.html",
         {
             "request": request,
             "current_user": current_user,
+            "theme_class": game.get("theme_class", ""),
         },
     )
 
@@ -103,12 +106,15 @@ def who_am_i_page(
     current_user: User | None = Depends(get_current_user_optional),
 ):
     """Render the Who Am I game page."""
+    game = next((game for game in GAMES if game["path"] == "/games/who-am-i"), {})
+
     return templates.TemplateResponse(
         request,
         "who_am_i.html",
         {
             "request": request,
             "current_user": current_user,
+            "theme_class": game.get("theme_class", ""),
         },
     )
 
@@ -119,11 +125,14 @@ def bluff_page(
     current_user: User | None = Depends(get_current_user_optional),
 ):
     """Render the Bluff game page."""
+    game = next((game for game in GAMES if game["path"] == "/games/bluff"), {})
+
     return templates.TemplateResponse(
         request,
         "bluff.html",
         {
             "request": request,
             "current_user": current_user,
+            "theme_class": game.get("theme_class", ""),
         },
     )

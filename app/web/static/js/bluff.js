@@ -19,17 +19,28 @@ let currentBluffRoomData = null;
 let bluffIsHost = false;
 let lastRenderedBluffSignature = null;
 
+let selectedBluffPlayerCount = null;
+let selectedBluffRounds = null;
+let selectedBluffCategories = [];
+const MAX_CATEGORIES = 12;
+
+const bluffPlayerCountOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+const bluffRoundsOptions = [1, 3, 5, 7, 10];
+
 const bluffCategoryLabels = {
     capitals: "عواصم 🌍",
     football: "كرة قدم ⚽",
     syrian_food: "أكلات سورية 🍲",
     general: "معلومات عامة 🧠",
+    strange_facts: "معلومات غريبة"
 };
 
 /**
  * Initialize page.
  */
 document.addEventListener("DOMContentLoaded", async () => {
+    renderBluffPlayerCountButtons();
+    renderBluffRoundsButtons();
     await loadBluffCategories();
 
     if (currentBluffPlayerName) {
@@ -56,26 +67,150 @@ document.addEventListener("DOMContentLoaded", async () => {
  */
 async function loadBluffCategories() {
     const response = await fetch("/api/bluff/categories");
-    console.log("status:", response.status);
-    console.log("content-type:", response.headers.get("content-type"));
+    const data = await response.json();
 
-    const text = await response.text();
-    console.log("raw response:", text);
+    const container = document.getElementById("bluffCategoryGrid");
+    if (!container) return;
 
-    const data = JSON.parse(text);
-
-    const select = document.getElementById("bluffCategory");
-    if (!select) return;
-
-    select.innerHTML = "";
+    container.innerHTML = "";
 
     Object.keys(data.categories).forEach((key) => {
-        const option = document.createElement("option");
-        option.value = key;
-        option.textContent = bluffCategoryLabels[key] || key;
-        select.appendChild(option);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.categoryKey = key;
+        button.textContent = bluffCategoryLabels[key] || key;
+        button.onclick = () => toggleBluffCategory(key);
+
+        container.appendChild(button);
+    });
+
+    updateBluffCategoryButtonsState();
+}
+
+function renderBluffPlayerCountButtons() {
+    const container = document.getElementById("bluffPlayerCountGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    bluffPlayerCountOptions.forEach((count) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.playerCount = String(count);
+        button.textContent = `${count} لاعبين`;
+        button.onclick = () => selectBluffPlayerCount(count);
+
+        container.appendChild(button);
+    });
+
+    updateBluffPlayerCountButtonsState();
+}
+
+function selectBluffPlayerCount(count) {
+    selectedBluffPlayerCount = count;
+    updateBluffPlayerCountButtonsState();
+}
+
+function updateBluffPlayerCountButtonsState() {
+    const buttons = document.querySelectorAll("#bluffPlayerCountGrid .category-btn");
+
+    buttons.forEach((btn) => {
+        const count = Number(btn.dataset.playerCount);
+
+        if (count === selectedBluffPlayerCount) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
     });
 }
+
+function renderBluffRoundsButtons() {
+    const container = document.getElementById("bluffRoundsGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    bluffRoundsOptions.forEach((rounds) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.rounds = String(rounds);
+        button.textContent = `${rounds} جولات`;
+        button.onclick = () => selectBluffRounds(rounds);
+
+        container.appendChild(button);
+    });
+
+    updateBluffRoundsButtonsState();
+}
+
+function selectBluffRounds(rounds) {
+    selectedBluffRounds = rounds;
+    updateBluffRoundsButtonsState();
+}
+
+function updateBluffRoundsButtonsState() {
+    const buttons = document.querySelectorAll("#bluffRoundsGrid .category-btn");
+
+    buttons.forEach((btn) => {
+        const rounds = Number(btn.dataset.rounds);
+
+        if (rounds === selectedBluffRounds) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+    });
+}
+
+function toggleBluffCategory(categoryKey) {
+    const isSelected = selectedBluffCategories.includes(categoryKey);
+
+    if (isSelected) {
+        selectedBluffCategories = selectedBluffCategories.filter((c) => c !== categoryKey);
+    } else {
+        if (selectedBluffCategories.length >= MAX_CATEGORIES) {
+            alert(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
+            return;
+        }
+
+        selectedBluffCategories.push(categoryKey);
+    }
+
+    updateBluffCategoryButtonsState();
+}
+
+function updateBluffCategoryButtonsState() {
+    const info = document.getElementById("bluffCategorySelectionInfo");
+    if (info) {
+        info.textContent = `تم اختيار ${selectedBluffCategories.length} / ${MAX_CATEGORIES}`;
+    }
+
+    const buttons = document.querySelectorAll("#bluffCategoryGrid .category-btn");
+
+    buttons.forEach((btn) => {
+        const key = btn.dataset.categoryKey;
+        const isSelected = selectedBluffCategories.includes(key);
+
+        if (isSelected) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+
+        if (!isSelected && selectedBluffCategories.length >= MAX_CATEGORIES) {
+            btn.classList.add("disabled");
+            btn.disabled = true;
+        } else {
+            btn.classList.remove("disabled");
+            btn.disabled = false;
+        }
+    });
+}
+
 
 /**
  * Show bluff setup screen.
@@ -107,15 +242,30 @@ function goBackToBluffLobby() {
  * Create a new bluff room.
  */
 async function createBluffRoom() {
-    const hostName = currentBluffPlayerName || document.getElementById("bluffName").value.trim();
-    const playerCount = parseInt(document.getElementById("bluffPlayerCount").value, 10);
-    const totalRounds = parseInt(document.getElementById("bluffRounds").value, 10);
-    const category = document.getElementById("bluffCategory").value;
+    const hostName = document.getElementById("bluffName").value.trim();
+    const playerCount = selectedBluffPlayerCount;
+    const totalRounds = selectedBluffRounds;
 
     if (!hostName) {
         alert("الرجاء إدخال الاسم أولاً!");
         return;
     }
+
+    if (!playerCount) {
+        alert("اختر عدد اللاعبين أولاً!");
+        return;
+    }
+
+    if (!totalRounds) {
+        alert("اختر عدد الجولات أولاً!");
+        return;
+    }
+
+    if (selectedBluffCategories.length === 0) {
+        alert("اختر تصنيفاً واحداً على الأقل!");
+        return;
+    }
+
 
     const response = await fetch("/api/bluff/rooms", {
         method: "POST",
@@ -124,7 +274,7 @@ async function createBluffRoom() {
             host_name: hostName,
             player_count: playerCount,
             total_rounds: totalRounds,
-            category: category
+            categories: selectedBluffCategories
         })
     });
 
@@ -313,14 +463,25 @@ async function advanceBluffRound() {
  * Restart bluff game with same players.
  */
 async function restartBluffGame() {
-    const category = document.getElementById("bluffCategory").value;
-    const totalRounds = parseInt(document.getElementById("bluffRounds").value, 10);
+    const totalRounds = selectedBluffRounds;
 
-    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/restart`, {
+    if (!totalRounds) {
+        alert("اختر عدد الجولات أولاً!");
+        return;
+    }
+
+    if (selectedBluffCategories.length === 0) {
+        alert("اختر تصنيفاً واحداً على الأقل!");
+        return;
+    }
+
+    
+
+    const response = await fetch(`/api/bluff/rooms/${bluffRoomCode}/restart`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
-            category: category,
+            categories: selectedBluffCategories,
             total_rounds: totalRounds
         })
     });
@@ -332,10 +493,9 @@ async function restartBluffGame() {
         return;
     }
 
-    currentBluffRoomData = data;
-    bluffIsHost = currentBluffPlayerId === data.host_id;
-    lastRenderedBluffSignature = null;
-
+    bluffRoomData = data;
+    bluffIsHost = bluffPlayerId === data.host_id;
+    bluffLastSignature = null;
     renderBluffWaitingRoom(data);
 }
 
@@ -714,6 +874,9 @@ function clearBluffLocalState() {
     currentBluffRoomData = null;
     bluffIsHost = false;
     lastRenderedBluffSignature = null;
+    selectedBluffPlayerCount = null;
+    selectedBluffRounds = null;
+    selectedBluffCategories = [];
 }
 
 /**

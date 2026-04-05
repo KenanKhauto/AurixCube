@@ -28,7 +28,6 @@ class WhoAmIRoom:
 
     room_code: str
     host_id: str
-    category: str
     player_count: int
     started: bool = False
     ended: bool = False
@@ -44,3 +43,4 @@ class WhoAmIRoom:
 
     solve_counter: int = 0
     players: Dict[str, WhoAmIPlayer] = field(default_factory=dict)
+    categories: list[str] = field(default_factory=list)

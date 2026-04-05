@@ -3,97 +3,89 @@
 {% block title %}مندس الحارة{% endblock %}
 
 {% block content %}
-<div id="screen-lobby" class="card glow-border">
-    <h1 style="color:var(--primary); text-shadow: var(--glow);">بوابة الزبداني</h1>
-    <input type="text" id="pName" placeholder="اسمك المستعار....">
-    <button class="btn btn-primary" onclick="showMondasSetup()">إنشاء غرفة جديدة +</button>
-    <div style="margin:10px; color:#666">— أو —</div>
-    <input type="text" id="roomInput" placeholder="كود الغرفة">
-    <button class="btn" onclick="joinRoom()">انضمام للغرفة</button>
-</div>
-
-<div id="screen-mondas-setup" class="card hidden">
-    <h2 style="color:var(--primary)">إعدادات الجولة</h2>
-
-    <label>عدد اللاعبين:</label>
-    <select id="playerCount">
-        <option value="3">3 لاعبين</option>
-        <option value="4" selected>4 لاعبين</option>
-        <option value="5">5 لاعبين</option>
-        <option value="6">6 لاعبين</option>
-        <option value="7">7 لاعبين</option>
-        <option value="8">8 لاعبين</option>
-        <option value="9">9 لاعبين</option>
-        <option value="10">10 لاعبين</option>
-    </select>
-    </br>
-    <label>عدد المندسين:</label>
-    <select id="numSpies">
-        <option value="1">1 مندس</option>
-        <option value="2">2 مندسين</option>
-        <option value="3">3 مندسين</option>
-        <option value="4">4 مندسين</option>
-    </select>
-
-    <label>التصنيف:</label>
-    <select id="mondasCat"></select>
-
-    <button class="btn btn-primary" onclick="createRoom()">تأكيد الإعدادات</button>
-    <button class="btn" onclick="showSelection()">رجوع</button>
-</div>
-
-<div id="screen-wait" class="card hidden">
-    <h3>كود الغرفة: <span id="displayCode" style="color:var(--primary)"></span></h3>
-
-    <div id="playerList" style="margin:15px 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;"></div>
-
-    <div id="adminArea" class="hidden">
-        <button class="btn btn-primary" onclick="startMondasGame()">ابدأ اللعبة الآن 🔥</button>
-        <button class="btn" onclick="deleteCurrentRoom()">حذف الغرفة 🗑️</button>
+<div class="{{ theme_class }}">
+    <div id="screen-lobby" class="card glow-border">
+        <div class="game-title-box">
+            <img src="/static/images/undercover-logo.png" class="game-title-logo">
+            <span class="game-title-text">لعبة المندس</span>
+        </div>
+        <input type="text" id="pName" placeholder="اسمك المستعار....">
+        <button class="btn btn-primary" onclick="showMondasSetup()">إنشاء غرفة جديدة +</button>
+        <div style="margin:10px; color:#666">— أو —</div>
+        <input type="text" id="roomInput" placeholder="كود الغرفة">
+        <button class="btn" onclick="joinRoom()">انضمام للغرفة</button>
     </div>
 
-    <div id="memberArea" class="hidden">
-        <button class="btn" onclick="leaveCurrentRoom()">خروج من الغرفة 🚪</button>
+    <div id="screen-mondas-setup" class="card hidden">
+        <h2 style="color:var(--primary)">إعدادات الجولة</h2>
+
+        <label>عدد اللاعبين:</label>
+        <div id="playerCountGrid" class="category-grid"></div>
+
+        <label>عدد المندسين:</label>
+        <div id="undercoverCountGrid" class="category-grid"></div>
+
+        <label>التصنيفات (اختر حتى 12):</label>
+        <div id="categorySelectionInfo" style="color:#aaa; margin-bottom:10px;">تم اختيار 0 / 12</div>
+        <div id="mondasCategoryGrid" class="category-grid"></div>
+
+        <button class="btn btn-primary" onclick="createRoom()">تأكيد الإعدادات</button>
+        <button class="btn" onclick="showSelection()">رجوع</button>
     </div>
 
-    <p id="waitMsg" style="color:#666">بانتظار أن يبدأ المنظم اللعب...</p>
-</div>
+    <div id="screen-wait" class="card hidden">
+        <h3>كود الغرفة: <span id="displayCode" style="color:var(--primary)"></span></h3>
 
-<div id="screen-reveal" class="card hidden">
-    <h2 style="color:var(--primary)">كلمتك السرية</h2>
+        <div id="playerList" style="margin:15px 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;"></div>
 
-    <div class="word-area">
-        <div id="mondasWord" class="word-text blur" onclick="toggleRevealWord(this)">إظهار الكلمة</div>
+        <div id="adminArea" class="hidden">
+            <button class="btn btn-primary" onclick="startMondasGame()">ابدأ اللعبة الآن 🔥</button>
+            <button class="btn" onclick="deleteCurrentRoom()">حذف الغرفة 🗑️</button>
+        </div>
+
+        <div id="memberArea" class="hidden">
+            <button class="btn" onclick="leaveCurrentRoom()">خروج من الغرفة 🚪</button>
+        </div>
+
+        <p id="waitMsg" style="color:#666">بانتظار أن يبدأ المنظم اللعب...</p>
     </div>
 
-    <button class="btn btn-primary" onclick="moveToPlay()">انتقل إلى الجولة ➡️</button>
-</div>
+    <div id="screen-reveal" class="card hidden">
+        <h2 style="color:var(--primary)">كلمتك السرية</h2>
 
-<div id="screen-play" class="card hidden">
-    <div id="roundInfo" style="color:#aaa; margin-bottom:10px; font-size:14px;"></div>
+        <div class="word-area">
+            <div id="mondasWord" class="word-text blur" onclick="toggleRevealWord(this)">إظهار الكلمة</div>
+        </div>
 
-    <div id="qBox" style="background:rgba(255,71,87,0.1); padding:15px; border-radius:10px; margin-bottom:10px; font-weight: bold;"></div>
-
-    <div class="word-area" style="padding:10px;">
-        <span id="myWordSmall" class="blur" onclick="toggleRevealWord(this)">كلمتك</span>
+        <button class="btn btn-primary" onclick="moveToPlay()">انتقل إلى الجولة ➡️</button>
     </div>
 
-    <div id="playActions" style="margin-bottom: 15px;"></div>
+    <div id="screen-play" class="card hidden">
+        <div id="roundInfo" style="color:#aaa; margin-bottom:10px; font-size:14px;"></div>
 
-    <div id="votersContainer"></div>
-</div>
+        <div id="qBox" style="background:rgba(255,71,87,0.1); padding:15px; border-radius:10px; margin-bottom:10px; font-weight: bold;"></div>
 
-<div id="screen-game-over" class="card hidden">
-    <h2 style="color:var(--primary)">انتهت اللعبة!</h2>
-    <div id="final-msg" style="font-size:20px; margin:20px; font-weight: bold;"></div>
+        <div class="word-area" style="padding:10px;">
+            <span id="myWordSmall" class="blur" onclick="toggleRevealWord(this)">كلمتك</span>
+        </div>
 
-    <div id="adminReplayArea" class="hidden">
-        <button class="btn btn-primary" onclick="restartGame()">جولة جديدة بنفس اللاعبين 🔄</button>
-        <button class="btn" onclick="deleteCurrentRoom()">حذف الغرفة 🗑️</button>
+        <div id="playActions" style="margin-bottom: 15px;"></div>
+
+        <div id="votersContainer"></div>
     </div>
 
-    <div id="memberGameOverArea" class="hidden">
-        <button class="btn" onclick="resetAndExit()">خروج</button>
+    <div id="screen-game-over" class="card hidden">
+        <h2 style="color:var(--primary)">انتهت اللعبة!</h2>
+        <div id="final-msg" style="font-size:20px; margin:20px; font-weight: bold;"></div>
+
+        <div id="adminReplayArea" class="hidden">
+            <button class="btn btn-primary" onclick="restartGame()">جولة جديدة بنفس اللاعبين 🔄</button>
+            <button class="btn" onclick="deleteCurrentRoom()">حذف الغرفة 🗑️</button>
+        </div>
+
+        <div id="memberGameOverArea" class="hidden">
+            <button class="btn" onclick="resetAndExit()">خروج</button>
+        </div>
     </div>
 </div>
 

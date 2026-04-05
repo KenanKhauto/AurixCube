@@ -11,7 +11,7 @@ class BluffCreateRoomRequest(BaseModel):
     host_name: str
     player_count: int = Field(..., ge=2, le=10)
     total_rounds: int = Field(..., ge=1, le=10)
-    category: str
+    categories: list[str]
 
 
 class BluffJoinRoomRequest(BaseModel):
@@ -33,7 +33,7 @@ class BluffAdvanceRoundRequest(BaseModel):
 
 
 class BluffRestartGameRequest(BaseModel):
-    category: str
+    categories: list[str]
     total_rounds: int = Field(..., ge=1, le=10)
 
 
@@ -62,7 +62,7 @@ class BluffAnswerOptionView(BaseModel):
 class BluffRoomStateResponse(BaseModel):
     room_code: str
     host_id: str
-    category: str
+    categories: list[str]
     player_count: int
     total_rounds: int
     started: bool

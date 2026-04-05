@@ -27,7 +27,7 @@ class UndercoverRoom:
 
     room_code: str
     host_id: str
-    category: str
+    categories: list[str]    
     player_count: int
     undercover_count: int
     started: bool = False

@@ -31,7 +31,7 @@ def build_room_response(room) -> RoomStateResponse:
     return RoomStateResponse(
         room_code=room.room_code,
         host_id=room.host_id,
-        category=room.category,
+        categories=room.categories,
         player_count=room.player_count,
         undercover_count=room.undercover_count,
         started=room.started,
@@ -69,7 +69,7 @@ def create_room(payload: CreateRoomRequest):
             host_name=payload.host_name,
             player_count=payload.player_count,
             undercover_count=payload.undercover_count,
-            category=payload.category,
+            categories=payload.categories,
         )
         return build_room_response(room)
     except Exception as exc:
@@ -129,7 +129,7 @@ def vote(room_code: str, payload: VoteRequest):
 def restart_room(room_code: str, payload: RestartRoomRequest):
     """Restart room with same players and new settings."""
     try:
-        room = service.restart_game(room_code, payload.category, payload.undercover_count)
+        room = service.restart_game(room_code, payload.categories, payload.undercover_count)
         return build_room_response(room)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

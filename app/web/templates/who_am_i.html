@@ -3,91 +3,87 @@
 {% block title %}من أنا؟{% endblock %}
 
 {% block content %}
-<div id="screen-lobby" class="card glow-border">
-    <h1 style="color:var(--primary); text-shadow: var(--glow);">من أنا؟ 🤔</h1>
-    <input type="text" id="pName" placeholder="اسمك المستعار....">
-    <button class="btn btn-primary" onclick="showSetup()">إنشاء غرفة جديدة +</button>
-    <div style="margin:10px; color:#666">— أو —</div>
-    <input type="text" id="roomInput" placeholder="كود الغرفة">
-    <button class="btn" onclick="joinRoom()">انضمام للغرفة</button>
-</div>
-
-<div id="screen-setup" class="card hidden">
-    <h2 style="color:var(--primary)">إعدادات اللعبة</h2>
-
-    <label>عدد اللاعبين:</label>
-    <select id="playerCount">
-        <option value="2">2 لاعبين</option>
-        <option value="3">3 لاعبين</option>
-        <option value="4" selected>4 لاعبين</option>
-        <option value="5">5 لاعبين</option>
-        <option value="6">6 لاعبين</option>
-        <option value="7">7 لاعبين</option>
-        <option value="8">8 لاعبين</option>
-    </select>
-
-    <label>التصنيف:</label>
-    <select id="gameCategory"></select>
-
-    <button class="btn btn-primary" onclick="createRoom()">تأكيد الإعدادات</button>
-    <button class="btn" onclick="goBackToLobby()">رجوع</button>
-</div>
-
-<div id="screen-wait" class="card hidden">
-    <h3>كود الغرفة: <span id="displayCode" style="color:var(--primary)"></span></h3>
-    <div id="playerList" style="margin:15px 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;"></div>
-
-    <div id="adminArea" class="hidden">
-        <button class="btn btn-primary" onclick="startGame()">ابدأ اللعبة 🔥</button>
-        <button class="btn" onclick="deleteCurrentRoom()">حذف الغرفة 🗑️</button>
+<div class="{{ theme_class }}">
+    <div id="screen-lobby" class="card glow-border">
+        <div class="game-title-box">
+            <img src="/static/images/who-am-i-logo.png" class="game-title-logo">
+            <span class="game-title-text">من أنا؟</span>
+        </div>
+        <input type="text" id="pName" placeholder="اسمك المستعار....">
+        <button class="btn btn-primary" onclick="showSetup()">إنشاء غرفة جديدة +</button>
+        <div style="margin:10px; color:#666">— أو —</div>
+        <input type="text" id="roomInput" placeholder="كود الغرفة">
+        <button class="btn" onclick="joinRoom()">انضمام للغرفة</button>
     </div>
 
-    <div id="memberArea" class="hidden">
-        <button class="btn" onclick="leaveCurrentRoom()">خروج من الغرفة 🚪</button>
+    <div id="screen-setup" class="card hidden">
+        <h2 style="color:var(--primary)">إعدادات اللعبة</h2>
+
+        <label>عدد اللاعبين:</label>
+        <div id="playerCountGrid" class="category-grid"></div>
+
+        <label>التصنيفات (اختر حتى 12):</label>
+        <div id="categoryGrid" class="category-grid"></div>
+
+        <button class="btn btn-primary" onclick="createRoom()">تأكيد الإعدادات</button>
+        <button class="btn" onclick="goBackToLobby()">رجوع</button>
     </div>
 
-    <p id="waitMsg" style="color:#666">بانتظار أن يبدأ المنظم اللعب...</p>
+    <div id="screen-wait" class="card hidden">
+        <h3>كود الغرفة: <span id="displayCode" style="color:var(--primary)"></span></h3>
+        <div id="playerList" style="margin:15px 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;"></div>
+
+        <div id="adminArea" class="hidden">
+            <button class="btn btn-primary" onclick="startGame()">ابدأ اللعبة 🔥</button>
+            <button class="btn" onclick="deleteCurrentRoom()">حذف الغرفة 🗑️</button>
+        </div>
+
+        <div id="memberArea" class="hidden">
+            <button class="btn" onclick="leaveCurrentRoom()">خروج من الغرفة 🚪</button>
+        </div>
+
+        <p id="waitMsg" style="color:#666">بانتظار أن يبدأ المنظم اللعب...</p>
+    </div>
+
+    <div id="screen-reveal" class="card hidden">
+        <h2 style="color:var(--primary)">مرحلة كشف الهويات</h2>
+        <p id="revealStatus" style="color:#aaa;"></p>
+
+        <div class="word-area">
+            <div id="identityBox" class="word-text">بانتظار الدور...</div>
+        </div>
+
+        <button id="nextRevealBtn" class="btn btn-primary hidden" onclick="advanceRevealPhase()">اللاعب التالي ➡️</button>
+    </div>
+
+    <div id="screen-play" class="card hidden">
+        <div id="roundInfo" style="color:#aaa; margin-bottom:10px; font-size:14px;"></div>
+
+        <div id="turnBox" style="background:rgba(255,71,87,0.1); padding:15px; border-radius:10px; margin-bottom:10px; font-weight: bold;"></div>
+
+        <div class="word-area" style="padding:10px;">
+            <span id="myIdentitySmall">هويتي ما زالت مخفية</span>
+        </div>
+
+        <div id="guessArea"></div>
+        <div id="playersState"></div>
+    </div>
+
+    <div id="screen-game-over" class="card hidden">
+        <h2 style="color:var(--primary)">انتهت اللعبة!</h2>
+        <div id="finalMsg" style="font-size:20px; margin:20px; font-weight: bold;"></div>
+
+        <div id="rankingTableContainer" style="margin-top: 20px;"></div>
+
+        <div id="adminReplayArea" class="hidden">
+            <button class="btn btn-primary" onclick="restartGame()">جولة جديدة 🔄</button>
+            <button class="btn" onclick="deleteCurrentRoom()">حذف الغرفة 🗑️</button>
+        </div>
+
+        <div id="memberGameOverArea" class="hidden">
+            <button class="btn" onclick="resetAndExit()">خروج</button>
+        </div>
+    </div>
 </div>
-
-<div id="screen-reveal" class="card hidden">
-    <h2 style="color:var(--primary)">مرحلة كشف الهويات</h2>
-    <p id="revealStatus" style="color:#aaa;"></p>
-
-    <div class="word-area">
-        <div id="identityBox" class="word-text">بانتظار الدور...</div>
-    </div>
-
-    <button id="nextRevealBtn" class="btn btn-primary hidden" onclick="advanceRevealPhase()">اللاعب التالي ➡️</button>
-</div>
-
-<div id="screen-play" class="card hidden">
-    <div id="roundInfo" style="color:#aaa; margin-bottom:10px; font-size:14px;"></div>
-
-    <div id="turnBox" style="background:rgba(255,71,87,0.1); padding:15px; border-radius:10px; margin-bottom:10px; font-weight: bold;"></div>
-
-    <div class="word-area" style="padding:10px;">
-        <span id="myIdentitySmall">هويتي ما زالت مخفية</span>
-    </div>
-
-    <div id="guessArea"></div>
-    <div id="playersState"></div>
-</div>
-
-<div id="screen-game-over" class="card hidden">
-    <h2 style="color:var(--primary)">انتهت اللعبة!</h2>
-    <div id="finalMsg" style="font-size:20px; margin:20px; font-weight: bold;"></div>
-
-    <div id="rankingTableContainer" style="margin-top: 20px;"></div>
-
-    <div id="adminReplayArea" class="hidden">
-        <button class="btn btn-primary" onclick="restartGame()">جولة جديدة 🔄</button>
-        <button class="btn" onclick="deleteCurrentRoom()">حذف الغرفة 🗑️</button>
-    </div>
-
-    <div id="memberGameOverArea" class="hidden">
-        <button class="btn" onclick="resetAndExit()">خروج</button>
-    </div>
-</div>
-
 <script src="/static/js/who_am_i.js"></script>
 {% endblock %}

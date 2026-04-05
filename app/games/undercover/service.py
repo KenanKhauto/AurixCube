@@ -34,13 +34,22 @@ class UndercoverGameService:
         host_name: str,
         player_count: int,
         undercover_count: int,
-        category: str,
+        categories: list[str],
     ) -> UndercoverRoom:
         """
         Create a new room and add the host as the first player.
         """
-        if category not in CATEGORIES:
-            raise ValueError("Invalid category.")
+        categories = list(dict.fromkeys(categories))
+
+        if not categories:
+            raise ValueError("At least one category must be selected.")
+
+        if len(categories) > 12:
+            raise ValueError("You can select up to 12 categories only.")
+
+        invalid_categories = [category for category in categories if category not in CATEGORIES]
+        if invalid_categories:
+            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
 
         room_code = generate_room_code()
         host_id = str(uuid.uuid4())
@@ -48,7 +57,7 @@ class UndercoverGameService:
         room = UndercoverRoom(
             room_code=room_code,
             host_id=host_id,
-            category=category,
+            categories=categories,
             player_count=player_count,
             undercover_count=undercover_count,
         )
@@ -122,7 +131,14 @@ class UndercoverGameService:
         if len(room.players) != room.player_count:
             raise ValueError("Room is not full yet.")
 
-        words = CATEGORIES[room.category]
+        words = []
+        for category in room.categories:
+            words.extend(CATEGORIES[category])
+
+        if not words:
+            raise ValueError("No words available in selected categories.")
+
+        chosen_word = random.choice(words)
         chosen_word = random.choice(words)
         player_ids = list(room.players.keys())
         undercover_ids = choose_random_players(player_ids, room.undercover_count)
@@ -212,7 +228,7 @@ class UndercoverGameService:
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
-    def restart_game(self, room_code: str, category: str, undercover_count: int) -> UndercoverRoom:
+    def restart_game(self, room_code: str, categories: list[str], undercover_count: int) -> UndercoverRoom:
         """
         Restart the current room while keeping the same players.
 
@@ -220,10 +236,19 @@ class UndercoverGameService:
         """
         room = self._get_room(room_code)
 
-        if category not in CATEGORIES:
-            raise ValueError("Invalid category.")
+        categories = list(dict.fromkeys(categories))
 
-        room.category = category
+        if not categories:
+            raise ValueError("At least one category must be selected.")
+
+        if len(categories) > 12:
+            raise ValueError("You can select up to 12 categories only.")
+
+        invalid_categories = [category for category in categories if category not in CATEGORIES]
+        if invalid_categories:
+            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
+
+        room.categories = categories
         room.undercover_count = undercover_count
 
         for player in room.players.values():
@@ -372,7 +397,7 @@ class UndercoverGameService:
         return {
             "room_code": room.room_code,
             "host_id": room.host_id,
-            "category": room.category,
+            "categories": room.categories,
             "player_count": room.player_count,
             "undercover_count": room.undercover_count,
             "started": room.started,
@@ -402,7 +427,7 @@ class UndercoverGameService:
         room = UndercoverRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],
-            category=data["category"],
+            categories=data.get("categories", [data["category"]] if "category" in data else []),
             player_count=data["player_count"],
             undercover_count=data["undercover_count"],
             started=data["started"],

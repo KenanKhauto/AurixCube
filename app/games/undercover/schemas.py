@@ -10,7 +10,7 @@ class CreateRoomRequest(BaseModel):
     host_name: str = Field(..., min_length=1, max_length=50)
     player_count: int = Field(..., ge=3, le=20)
     undercover_count: int = Field(..., ge=1, le=4)
-    category: str
+    categories: list[str]
 
 
 class JoinRoomRequest(BaseModel):
@@ -35,7 +35,7 @@ class RevealWordRequest(BaseModel):
 class RestartRoomRequest(BaseModel):
     """Request body for restarting the room."""
 
-    category: str
+    categories: list[str]
     undercover_count: int
 
 
@@ -53,7 +53,7 @@ class RoomStateResponse(BaseModel):
 
     room_code: str
     host_id: str
-    category: str
+    categories: list[str]
     player_count: int
     undercover_count: int
     started: bool

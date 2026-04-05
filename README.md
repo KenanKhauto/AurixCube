@@ -24,3 +24,10 @@ The platform currently includes an Undercover-style game with room creation, joi
 ```bash
 pip install -r requirements.txt
 python run.py
+```
+
+## License
+
+ArcadiaHub Proprietary License v1.0
+
+This project is proprietary software. Unauthorized use, copying, modification, or distribution is strictly prohibited.

@@ -3,123 +3,111 @@
 {% block title %}لعبة الخداع{% endblock %}
 
 {% block content %}
-<div id="screen-bluff-lobby" class="card glow-border">
-    <h1 style="color:var(--primary); text-shadow: var(--glow);">لعبة الخداع</h1>
-    <input type="text" id="bluffName" placeholder="اسمك المستعار....">
-    <button class="btn btn-primary" onclick="showBluffSetup()">إنشاء غرفة جديدة +</button>
-    <div style="margin:10px; color:#666">— أو —</div>
-    <input type="text" id="bluffRoomInput" placeholder="كود الغرفة">
-    <button class="btn" onclick="joinBluffRoom()">انضمام للغرفة</button>
-</div>
-
-<div id="screen-bluff-setup" class="card hidden">
-    <h2 style="color:var(--primary)">إعدادات اللعبة</h2>
-
-    <label>عدد اللاعبين:</label>
-    <select id="bluffPlayerCount">
-        <option value="2">2 لاعبين</option>
-        <option value="3">3 لاعبين</option>
-        <option value="4" selected>4 لاعبين</option>
-        <option value="5">5 لاعبين</option>
-        <option value="6">6 لاعبين</option>
-        <option value="7">7 لاعبين</option>
-        <option value="8">8 لاعبين</option>
-        <option value="9">9 لاعبين</option>
-        <option value="10">10 لاعبين</option>
-    </select>
-    </br>
-
-    <label>عدد الجولات:</label>
-    <select id="bluffRounds">
-        <option value="1">1 جولة</option>
-        <option value="3" selected>3 جولات</option>
-        <option value="5">5 جولات</option>
-        <option value="7">7 جولات</option>
-        <option value="10">10 جولات</option>
-    </select>
-
-    <label>التصنيف:</label>
-    <select id="bluffCategory"></select>
-
-    <button class="btn btn-primary" onclick="createBluffRoom()">تأكيد الإعدادات</button>
-    <button class="btn" onclick="goBackToBluffLobby()">رجوع</button>
-</div>
-
-<div id="screen-bluff-wait" class="card hidden">
-    <h3>كود الغرفة: <span id="bluffDisplayCode" style="color:var(--primary)"></span></h3>
-
-    <div id="bluffPlayerList" style="margin:15px 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;"></div>
-
-    <div id="bluffHostArea" class="hidden">
-        <button class="btn btn-primary" onclick="startBluffGame()">ابدأ اللعبة الآن 🔥</button>
-        <button class="btn" onclick="deleteBluffRoom()">حذف الغرفة 🗑️</button>
+<div class="{{ theme_class }}">
+    <div id="screen-bluff-lobby" class="card glow-border">
+        <div class="game-title-box">
+            <img src="/static/images/bluff-logo.png" class="game-title-logo">
+            <span class="game-title-text">لعبة الخداع</span>
+        </div>
+        <input type="text" id="bluffName" placeholder="اسمك المستعار....">
+        <button class="btn btn-primary" onclick="showBluffSetup()">إنشاء غرفة جديدة +</button>
+        <div style="margin:10px; color:#666">— أو —</div>
+        <input type="text" id="bluffRoomInput" placeholder="كود الغرفة">
+        <button class="btn" onclick="joinBluffRoom()">انضمام للغرفة</button>
     </div>
 
-    <div id="bluffMemberArea" class="hidden">
-        <button class="btn" onclick="leaveBluffRoom()">خروج من الغرفة 🚪</button>
+    <div id="screen-bluff-setup" class="card hidden">
+        <h2 style="color:var(--primary)">إعدادات اللعبة</h2>
+
+        <label>عدد اللاعبين:</label>
+        <div id="bluffPlayerCountGrid" class="category-grid"></div>
+
+        <label>عدد الجولات:</label>
+        <div id="bluffRoundsGrid" class="category-grid"></div>
+
+        <label>التصنيفات (اختر حتى 12):</label>
+        <div id="bluffCategorySelectionInfo" style="color:#aaa; margin-bottom:10px;">تم اختيار 0 / 12</div>
+        <div id="bluffCategoryGrid" class="category-grid"></div>
+
+        <button class="btn btn-primary" onclick="createBluffRoom()">تأكيد الإعدادات</button>
+        <button class="btn" onclick="goBackToBluffLobby()">رجوع</button>
     </div>
 
-    <p style="color:#666">بانتظار أن يبدأ المنظم اللعب...</p>
-</div>
+    <div id="screen-bluff-wait" class="card hidden">
+        <h3>كود الغرفة: <span id="bluffDisplayCode" style="color:var(--primary)"></span></h3>
 
-<div id="screen-bluff-writing" class="card hidden">
-    <div id="bluffRoundInfo" style="color:#aaa; margin-bottom:10px; font-size:14px;"></div>
+        <div id="bluffPlayerList" style="margin:15px 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;"></div>
 
-    <div id="bluffQuestionBox" style="background:rgba(255,71,87,0.1); padding:15px; border-radius:10px; margin-bottom:15px; font-weight:bold;"></div>
+        <div id="bluffHostArea" class="hidden">
+            <button class="btn btn-primary" onclick="startBluffGame()">ابدأ اللعبة الآن 🔥</button>
+            <button class="btn" onclick="deleteBluffRoom()">حذف الغرفة 🗑️</button>
+        </div>
 
-    <div id="bluffSubmissionsInfo" style="margin-bottom:15px; color:#aaa;"></div>
+        <div id="bluffMemberArea" class="hidden">
+            <button class="btn" onclick="leaveBluffRoom()">خروج من الغرفة 🚪</button>
+        </div>
 
-    <input type="text" id="bluffAnswerInput" placeholder="اكتب إجابة خادعة تبدو صحيحة...">
-    <button class="btn btn-primary" onclick="submitBluffAnswer()">إرسال الإجابة</button>
-
-    <h3 style="margin-top:20px;">النتائج الحالية</h3>
-    <div id="bluffScoreboardWriting" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px;"></div>
-</div>
-
-<div id="screen-bluff-voting" class="card hidden">
-    <div id="bluffRoundInfoVoting" style="color:#aaa; margin-bottom:10px; font-size:14px;"></div>
-
-    <div id="bluffQuestionBoxVoting" style="background:rgba(255,71,87,0.1); padding:15px; border-radius:10px; margin-bottom:15px; font-weight:bold;"></div>
-
-    <div id="bluffVotesInfo" style="margin-bottom:15px; color:#aaa;"></div>
-
-    <div id="bluffOptionsContainer"></div>
-
-    <h3 style="margin-top:20px;">النتائج الحالية</h3>
-    <div id="bluffScoreboardVoting" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px;"></div>
-</div>
-
-<div id="screen-bluff-result" class="card hidden">
-    <h2 style="color:var(--primary)">نتيجة الجولة</h2>
-
-    <div id="bluffResultMessage" style="font-size:18px; margin:15px;"></div>
-
-    <div id="bluffResultsContainer"></div>
-
-    <h3 style="margin-top:20px;">النقاط المكتسبة</h3>
-    <div id="bluffScoreChanges" style="margin-bottom:20px;"></div>
-
-    <h3>الترتيب الحالي</h3>
-    <div id="bluffScoreboardResult" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin-bottom:20px;"></div>
-
-    <div id="bluffAdvanceArea"></div>
-</div>
-
-<div id="screen-bluff-game-over" class="card hidden">
-    <h2 style="color:var(--primary)">انتهت اللعبة!</h2>
-    <div id="bluffFinalMsg" style="font-size:20px; margin:20px; font-weight:bold;"></div>
-
-    <div id="bluffScoreboardFinal" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin-bottom:20px;"></div>
-
-    <div id="bluffGameOverAdminArea" class="hidden">
-        <button class="btn btn-primary" onclick="restartBluffGame()">جولة جديدة بنفس اللاعبين 🔄</button>
-        <button class="btn" onclick="deleteBluffRoom()">حذف الغرفة 🗑️</button>
+        <p style="color:#666">بانتظار أن يبدأ المنظم اللعب...</p>
     </div>
 
-    <div id="bluffGameOverMemberArea" class="hidden">
-        <button class="btn" onclick="resetBluffAndExit()">خروج</button>
+    <div id="screen-bluff-writing" class="card hidden">
+        <div id="bluffRoundInfo" style="color:#aaa; margin-bottom:10px; font-size:14px;"></div>
+
+        <div id="bluffQuestionBox" style="background:rgba(255,71,87,0.1); padding:15px; border-radius:10px; margin-bottom:15px; font-weight:bold;"></div>
+
+        <div id="bluffSubmissionsInfo" style="margin-bottom:15px; color:#aaa;"></div>
+
+        <input type="text" id="bluffAnswerInput" placeholder="اكتب إجابة خادعة تبدو صحيحة...">
+        <button class="btn btn-primary" onclick="submitBluffAnswer()">إرسال الإجابة</button>
+
+        <h3 style="margin-top:20px;">النتائج الحالية</h3>
+        <div id="bluffScoreboardWriting" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px;"></div>
+    </div>
+
+    <div id="screen-bluff-voting" class="card hidden">
+        <div id="bluffRoundInfoVoting" style="color:#aaa; margin-bottom:10px; font-size:14px;"></div>
+
+        <div id="bluffQuestionBoxVoting" style="background:rgba(255,71,87,0.1); padding:15px; border-radius:10px; margin-bottom:15px; font-weight:bold;"></div>
+
+        <div id="bluffVotesInfo" style="margin-bottom:15px; color:#aaa;"></div>
+
+        <div id="bluffOptionsContainer"></div>
+
+        <h3 style="margin-top:20px;">النتائج الحالية</h3>
+        <div id="bluffScoreboardVoting" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px;"></div>
+    </div>
+
+    <div id="screen-bluff-result" class="card hidden">
+        <h2 style="color:var(--primary)">نتيجة الجولة</h2>
+
+        <div id="bluffResultMessage" style="font-size:18px; margin:15px;"></div>
+
+        <div id="bluffResultsContainer"></div>
+
+        <h3 style="margin-top:20px;">النقاط المكتسبة</h3>
+        <div id="bluffScoreChanges" style="margin-bottom:20px;"></div>
+
+        <h3>الترتيب الحالي</h3>
+        <div id="bluffScoreboardResult" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin-bottom:20px;"></div>
+
+        <div id="bluffAdvanceArea"></div>
+    </div>
+
+    <div id="screen-bluff-game-over" class="card hidden">
+        <h2 style="color:var(--primary)">انتهت اللعبة!</h2>
+        <div id="bluffFinalMsg" style="font-size:20px; margin:20px; font-weight:bold;"></div>
+
+        <div id="bluffScoreboardFinal" style="display:flex; flex-wrap:wrap; justify-content:center; gap:5px; margin-bottom:20px;"></div>
+
+        <div id="bluffGameOverAdminArea" class="hidden">
+            <button class="btn btn-primary" onclick="restartBluffGame()">جولة جديدة بنفس اللاعبين 🔄</button>
+            <button class="btn" onclick="deleteBluffRoom()">حذف الغرفة 🗑️</button>
+        </div>
+
+        <div id="bluffGameOverMemberArea" class="hidden">
+            <button class="btn" onclick="resetBluffAndExit()">خروج</button>
+        </div>
     </div>
 </div>
-
 <script src="/static/js/bluff.js"></script>
 {% endblock %}

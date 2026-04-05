@@ -3,20 +3,21 @@
 {% block title %}بوابة الألعاب{% endblock %}
 
 {% block content %}
-<div class="card glow-border" style="margin-top: 30px;">
+<div class="card glow-border games-page-card" style="margin-top: 30px;">
     <h1 style="color:var(--primary); text-shadow: var(--glow);">بوابة الألعاب</h1>
     <p style="color:#aaa;">اختر اللعبة التي تريد الدخول إليها</p>
 
     <div class="games-grid">
         {% for game in games %}
-            <a href="{{ game.path }}" style="text-decoration:none; color:inherit;">
-                <div class="game-option {% if game.get('disabled') %}disabled-opt{% endif %}">
+            <a href="{{ game.path }}" class="game-link">
+                <div class="game-option {{ game.get('outline_class', '') }} {% if game.get('disabled') %}disabled-opt{% endif %}">
+                    <img src="{{ game.logo }}" class="game-logo" />
                     {% if game.get('coming_soon') %}
                         <div class="cs-tag">Coming Soon</div>
                     {% endif %}
 
-                    <h3 style="margin:0">{{ game.name }}</h3>
-                    <p style="color:#888; font-size:12px;">{{ game.description }}</p>
+                    <h3 class="game-title">{{ game.name }}</h3>
+                    <p class="game-description">{{ game.description }}</p>
                 </div>
             </a>
         {% endfor %}

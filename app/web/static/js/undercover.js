@@ -16,6 +16,14 @@ let currentScreen = null;
 let lastRenderedSignature = null;
 let lastAnnouncementKey = null;
 
+let selectedPlayerCount = null;
+let selectedUndercoverCount = null;
+let selectedCategories = [];
+const MAX_CATEGORIES = 12;
+
+const playerCountOptions = [3, 4, 5, 6, 7, 8, 9, 10];
+const undercoverCountOptions = [1, 2, 3, 4];
+
 const categoryLabels = {
     cars: "سيارات 🚗",
     countries: "دول 🌍",
@@ -30,6 +38,8 @@ const categoryLabels = {
  * Initialize page.
  */
 document.addEventListener("DOMContentLoaded", async () => {
+    renderPlayerCountButtons();
+    renderUndercoverCountButtons();
     await loadCategories();
 
     if (currentPlayerName) {
@@ -58,18 +68,142 @@ async function loadCategories() {
     const response = await fetch("/api/undercover/categories");
     const data = await response.json();
 
-    const select = document.getElementById("mondasCat");
-    if (!select) return;
+    const container = document.getElementById("mondasCategoryGrid");
+    if (!container) return;
 
-    select.innerHTML = "";
+    container.innerHTML = "";
 
     Object.keys(data.categories).forEach((key) => {
-        const option = document.createElement("option");
-        option.value = key;
-        option.textContent = categoryLabels[key] || key;
-        select.appendChild(option);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.categoryKey = key;
+        button.textContent = categoryLabels[key] || key;
+        button.onclick = () => toggleCategory(key);
+
+        container.appendChild(button);
+    });
+
+    updateCategoryButtonsState();
+}
+
+function toggleCategory(categoryKey) {
+    const isSelected = selectedCategories.includes(categoryKey);
+
+    if (isSelected) {
+        selectedCategories = selectedCategories.filter((c) => c !== categoryKey);
+    } else {
+        if (selectedCategories.length >= MAX_CATEGORIES) {
+            alert(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
+            return;
+        }
+        selectedCategories.push(categoryKey);
+    }
+
+    updateCategoryButtonsState();
+}
+
+function updateCategoryButtonsState() {
+    const info = document.getElementById("categorySelectionInfo");
+    if (info) {
+        info.textContent = `تم اختيار ${selectedCategories.length} / ${MAX_CATEGORIES}`;
+    }
+
+    const buttons = document.querySelectorAll("#mondasCategoryGrid .category-btn");
+
+    buttons.forEach((btn) => {
+        const key = btn.dataset.categoryKey;
+        const isSelected = selectedCategories.includes(key);
+
+        if (isSelected) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+
+        if (!isSelected && selectedCategories.length >= MAX_CATEGORIES) {
+            btn.classList.add("disabled");
+            btn.disabled = true;
+        } else {
+            btn.classList.remove("disabled");
+            btn.disabled = false;
+        }
     });
 }
+
+
+function renderPlayerCountButtons() {
+    const container = document.getElementById("playerCountGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    playerCountOptions.forEach((count) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.playerCount = String(count);
+        button.textContent = `${count} لاعبين`;
+        button.onclick = () => {
+            selectedPlayerCount = count;
+            updatePlayerCountButtonsState();
+        };
+
+        container.appendChild(button);
+    });
+
+    updatePlayerCountButtonsState();
+}
+
+function updatePlayerCountButtonsState() {
+    const buttons = document.querySelectorAll("#playerCountGrid .category-btn");
+
+    buttons.forEach((btn) => {
+        const count = Number(btn.dataset.playerCount);
+        if (count === selectedPlayerCount) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+    });
+}
+
+function renderUndercoverCountButtons() {
+    const container = document.getElementById("undercoverCountGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    undercoverCountOptions.forEach((count) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.undercoverCount = String(count);
+        button.textContent = `${count} مندس`;
+        button.onclick = () => {
+            selectedUndercoverCount = count;
+            updateUndercoverCountButtonsState();
+        };
+
+        container.appendChild(button);
+    });
+
+    updateUndercoverCountButtonsState();
+}
+
+function updateUndercoverCountButtonsState() {
+    const buttons = document.querySelectorAll("#undercoverCountGrid .category-btn");
+
+    buttons.forEach((btn) => {
+        const count = Number(btn.dataset.undercoverCount);
+        if (count === selectedUndercoverCount) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+    });
+}
+
 
 /**
  * Show game selection screen.
@@ -107,15 +241,28 @@ function showMondasSetup() {
  */
 async function createRoom() {
     const hostName = currentPlayerName || document.getElementById("pName").value.trim();
-    const playerCount = parseInt(document.getElementById("playerCount").value, 10);
-    const undercoverCount = parseInt(document.getElementById("numSpies").value, 10);
-    const category = document.getElementById("mondasCat").value;
+    const playerCount = selectedPlayerCount;
+    const undercoverCount = selectedUndercoverCount;
 
     if (!hostName) {
         alert("الرجاء إدخال الاسم أولاً!");
         return;
     }
 
+    if (!playerCount) {
+        alert("اختر عدد اللاعبين أولاً!");
+        return;
+    }
+
+    if (!undercoverCount) {
+        alert("اختر عدد المندسين أولاً!");
+        return;
+    }
+
+    if (selectedCategories.length === 0) {
+        alert("اختر تصنيفاً واحداً على الأقل!");
+        return;
+    }
     const response = await fetch("/api/undercover/rooms", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
@@ -123,7 +270,7 @@ async function createRoom() {
             host_name: hostName,
             player_count: playerCount,
             undercover_count: undercoverCount,
-            category: category
+            categories: selectedCategories
         })
     });
 
@@ -586,14 +733,13 @@ async function submitVotes() {
  * Restart current game with same players.
  */
 async function restartGame() {
-    const category = document.getElementById("mondasCat").value;
-    const undercoverCount = parseInt(document.getElementById("numSpies").value, 10);
+    const undercoverCount = selectedUndercoverCount;
 
     const response = await fetch(`/api/undercover/rooms/${currentRoomCode}/restart`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
-            category: category,
+            categories: selectedCategories,
             undercover_count: undercoverCount
         })
     });
@@ -722,6 +868,9 @@ function clearLocalGameState() {
     currentScreen = null;
     lastRenderedSignature = null;
     lastAnnouncementKey = null;
+    selectedPlayerCount = null;
+    selectedUndercoverCount = null;
+    selectedCategories = [];
 }
 
 /**

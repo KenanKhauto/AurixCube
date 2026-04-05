@@ -27,7 +27,7 @@ def build_room_response(room) -> BluffRoomStateResponse:
     return BluffRoomStateResponse(
         room_code=room.room_code,
         host_id=room.host_id,
-        category=room.category,
+        categories=room.categories,
         player_count=room.player_count,
         total_rounds=room.total_rounds,
         started=room.started,
@@ -77,8 +77,8 @@ def create_room(payload: BluffCreateRoomRequest):
             host_name=payload.host_name,
             player_count=payload.player_count,
             total_rounds=payload.total_rounds,
-            category=payload.category,
-        )
+            categories=payload.categories,        
+            )
         return build_room_response(room)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -148,7 +148,7 @@ def advance_round(room_code: str, payload: BluffAdvanceRoundRequest):
 def restart_room(room_code: str, payload: BluffRestartGameRequest):
     """Restart room with same players and new settings."""
     try:
-        room = service.restart_game(room_code, payload.category, payload.total_rounds)
+        room = service.restart_game(room_code, payload.categories, payload.total_rounds)
         return build_room_response(room)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

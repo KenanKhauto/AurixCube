@@ -27,10 +27,19 @@ class BluffGameService:
         host_name: str,
         player_count: int,
         total_rounds: int,
-        category: str,
+        categories: list[str],
     ) -> BluffRoom:
-        if category not in BLUFF_CATEGORIES:
-            raise ValueError("Invalid category.")
+        categories = list(dict.fromkeys(categories))
+
+        if not categories:
+            raise ValueError("At least one category must be selected.")
+
+        if len(categories) > 12:
+            raise ValueError("You can select up to 12 categories only.")
+
+        invalid_categories = [category for category in categories if category not in BLUFF_CATEGORIES]
+        if invalid_categories:
+            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
 
         room_code = generate_room_code()
         host_id = str(uuid.uuid4())
@@ -38,7 +47,7 @@ class BluffGameService:
         room = BluffRoom(
             room_code=room_code,
             host_id=host_id,
-            category=category,
+            categories=categories,
             player_count=player_count,
             total_rounds=total_rounds,
         )
@@ -201,13 +210,22 @@ class BluffGameService:
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
-    def restart_game(self, room_code: str, category: str, total_rounds: int) -> BluffRoom:
+    def restart_game(self, room_code: str, categories: list[str], total_rounds: int) -> BluffRoom:
         room = self._get_room(room_code)
 
-        if category not in BLUFF_CATEGORIES:
-            raise ValueError("Invalid category.")
+        categories = list(dict.fromkeys(categories))
 
-        room.category = category
+        if not categories:
+            raise ValueError("At least one category must be selected.")
+
+        if len(categories) > 12:
+            raise ValueError("You can select up to 12 categories only.")
+
+        invalid_categories = [category for category in categories if category not in BLUFF_CATEGORIES]
+        if invalid_categories:
+            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
+
+        room.categories = categories
         room.total_rounds = total_rounds
         room.started = False
         room.ended = False
@@ -231,7 +249,9 @@ class BluffGameService:
         return room
 
     def _start_new_round(self, room: BluffRoom) -> None:
-        prompts = BLUFF_CATEGORIES[room.category]
+        prompts = []
+        for category in room.categories:
+            prompts.extend(BLUFF_CATEGORIES[category])
         available_indices = [i for i in range(len(prompts)) if i not in room.used_prompt_indices]
 
         if not available_indices:
@@ -367,7 +387,7 @@ class BluffGameService:
         return {
             "room_code": room.room_code,
             "host_id": room.host_id,
-            "category": room.category,
+            "categories": room.categories,
             "player_count": room.player_count,
             "total_rounds": room.total_rounds,
             "started": room.started,
@@ -407,7 +427,7 @@ class BluffGameService:
         room = BluffRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],
-            category=data["category"],
+            categories=data.get("categories", [data["category"]] if "category" in data else []),
             player_count=data["player_count"],
             total_rounds=data["total_rounds"],
             started=data.get("started", False),
