@@ -1,6 +1,4 @@
-- Results menu after each round in bluff ----- DONE
-- A horizontal table under round finished, and each answer should get the name of the one who typed it (after the round finished). ----- DONE
-- During a round show only the first 3 names with points. But after round or at the end, let them all be there.
+- Make the top 3 in each round glow gold, bronze, silver
 - change the sytle of the game make it schöner
 - add avatars for each players selection
-- 
+- Choose your avatar, in create, joing room.

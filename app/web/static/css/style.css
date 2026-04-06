@@ -576,7 +576,7 @@ select {
 /* Homepage card outline colors from registry */
 
 .game-outline-bluff {
-    border-color: #47d7ff;
+    border-color: #e6b657;
     box-shadow: 0 0 18px rgba(6, 176, 188, 0.18);
 }
 
@@ -707,8 +707,8 @@ select {
 /* ================= GAME THEMES ================= */
 
 .theme-bluff {
-    --primary: #47d7ff;
-    --glow: 0 0 15px rgba(71, 215, 255, 0.4);
+    --primary: #e6b657;
+    --glow: 0 0 15px #e6b657;
     --error-bg: rgba(71, 215, 255, 0.10);
     --error-border: rgba(71, 215, 255, 0.28);
 }
@@ -741,7 +741,7 @@ select {
 }
 
 .theme-bluff .game-header-logo {
-    filter: drop-shadow(0 0 10px #47d7ff);
+    filter: drop-shadow(0 0 10px #e6b657);
 }
 
 .theme-undercover .game-header-logo {

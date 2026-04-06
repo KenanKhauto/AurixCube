@@ -39,7 +39,6 @@ const bluffCategoryLabels = {
     animals: "حيوانات",
     proverbs: "أمثال شامية",
     player_career: "مسيرة لاعب",
-
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -758,8 +757,6 @@ function renderBluffRoundResult(data) {
     hideAllBluffScreens();
     document.getElementById("screen-bluff-result").classList.remove("hidden");
 
-    document.getElementById("bluffResultMessage").textContent =
-        data.last_round_message || "انتهت الجولة.";
 
     renderBluffAnswersResultTable(data);
     renderBluffRankingResultTable(data);
