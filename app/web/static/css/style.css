@@ -3,7 +3,7 @@
     --card: #1a1a1a;
     --primary: #ffffff;
     --text: #ffffff;
-    --glow: 0 0 15px rgba(255, 255, 255, 0.35);
+    --glow: 0 0 15px rgba(255, 200, 80, 0.45);
     --muted: #aaaaaa;
     --border: #333333;
     --surface: #222222;
@@ -61,26 +61,36 @@ body::before {
 }
 
 .games-icon {
-    width: 50px; /* adjust size */
-    height: auto;
+    width: 150px;
+    height: 150px;
     object-fit: contain;
-
-    /* nice glow */
-    filter: drop-shadow(0 0 8px rgba(255, 200, 80, 0.6));
+    margin-bottom: 6px;
+    filter: drop-shadow(0 0 10px rgba(255, 200, 80, 0.65));
 }
 
 .games-text {
     display: flex;
     flex-direction: column;
-    align-items: flex-start; /* text stays aligned */
+    align-items: center;
+    justify-content: center;
 }
 
 .games-title {
     margin: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #FFC857;
+    text-shadow: 0 0 10px rgba(255, 200, 80, 0.35);
+    text-align: center;
 }
 
 .games-subtitle {
-    margin: 0;
+    margin: 4px 0 0;
+    color: #aaa;
+    font-size: 14px;
+    text-align: center;
 }
 
 /* ================= NAVBAR ================= */
@@ -321,9 +331,11 @@ body::before {
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
-.glow-border {
-    border: 1px solid var(--primary);
-    box-shadow: var(--glow);
+.card.glow-border {
+    border: 1px solid rgba(255, 200, 80, 0.7);
+    box-shadow:
+        0 0 12px rgba(255, 200, 80, 0.25),
+        0 0 30px rgba(255, 180, 50, 0.15);
 }
 
 /* ================= BUTTONS ================= */
@@ -626,27 +638,30 @@ select {
 }
 
 .games-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
     text-align: center;
-    margin-bottom: 0px;
 }
 
 .games-divider {
-    width: 320px;
-    max-width: 80%;
-    margin-bottom: 4px;
-    opacity: 0.95;
-    filter: drop-shadow(0 0 8px rgba(255, 200, 80, 0.6));
+    width: 220px;
+    max-width: 60%;
+    margin-top: 8px;
+    display: block;
+    filter: drop-shadow(0 0 8px rgba(255, 200, 80, 0.45));
 }
 
 .games-title {
     font-family: 'Cinzel', serif;
     font-weight: 600;
     letter-spacing: 1px;
-
     background: linear-gradient(90deg, #FFD700, #FFC857, #FFB300);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
-
     text-shadow: 0 0 10px rgba(255, 200, 80, 0.5);
     margin: 0;
 }
