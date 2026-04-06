@@ -1,13 +1,14 @@
 /**
  * Frontend logic for the Bluff game.
  *
- * This version uses the FastAPI backend and supports:
+ * Supports:
  * - room creation / joining
  * - host deletion of room
  * - non-host leaving room before game starts
- * - round-based bluff submission
- * - voting on the correct answer
- * - scoreboards and round results
+ * - category chooser phase
+ * - simultaneous answer submission
+ * - answer picking
+ * - persistent round results
  * - restart game
  */
 
@@ -25,7 +26,7 @@ let selectedBluffCategories = [];
 const MAX_CATEGORIES = 12;
 
 const bluffPlayerCountOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
-const bluffRoundsOptions = [1, 3, 5, 7, 10];
+const bluffRoundsOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 const bluffCategoryLabels = {
     capitals: "دول",
@@ -34,12 +35,8 @@ const bluffCategoryLabels = {
     general: "معلومات عامة",
     strange_facts: "معلومات غريبة",
     islam: "إسلاميات",
-
 };
 
-/**
- * Initialize page.
- */
 document.addEventListener("DOMContentLoaded", async () => {
     renderBluffPlayerCountButtons();
     renderBluffRoundsButtons();
@@ -47,16 +44,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (currentBluffPlayerName) {
         const nameInput = document.getElementById("bluffName");
-        if (nameInput) {
-            nameInput.value = currentBluffPlayerName;
-        }
+        if (nameInput) nameInput.value = currentBluffPlayerName;
     }
 
     if (currentBluffRoomCode) {
         const roomInput = document.getElementById("bluffRoomInput");
-        if (roomInput) {
-            roomInput.value = currentBluffRoomCode;
-        }
+        if (roomInput) roomInput.value = currentBluffRoomCode;
     }
 
     if (currentBluffRoomCode && currentBluffPlayerId) {
@@ -64,9 +57,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
-/**
- * Load categories from backend and fill setup select.
- */
 async function loadBluffCategories() {
     const response = await fetch("/api/bluff/categories");
     const data = await response.json();
@@ -76,14 +66,13 @@ async function loadBluffCategories() {
 
     container.innerHTML = "";
 
-    Object.keys(data.categories).forEach((key) => {
+    (data.categories || []).forEach((key) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "category-btn";
         button.dataset.categoryKey = key;
         button.textContent = bluffCategoryLabels[key] || key;
         button.onclick = () => toggleBluffCategory(key);
-
         container.appendChild(button);
     });
 
@@ -102,30 +91,25 @@ function renderBluffPlayerCountButtons() {
         button.className = "category-btn";
         button.dataset.playerCount = String(count);
         button.textContent = `${count} لاعبين`;
-        button.onclick = () => selectBluffPlayerCount(count);
-
+        button.onclick = () => {
+            selectedBluffPlayerCount = count;
+            if (selectedBluffRounds && selectedBluffRounds < count) {
+                selectedBluffRounds = count;
+            }
+            updateBluffPlayerCountButtonsState();
+            updateBluffRoundsButtonsState();
+        };
         container.appendChild(button);
     });
 
     updateBluffPlayerCountButtonsState();
 }
 
-function selectBluffPlayerCount(count) {
-    selectedBluffPlayerCount = count;
-    updateBluffPlayerCountButtonsState();
-}
-
 function updateBluffPlayerCountButtonsState() {
     const buttons = document.querySelectorAll("#bluffPlayerCountGrid .category-btn");
-
     buttons.forEach((btn) => {
         const count = Number(btn.dataset.playerCount);
-
-        if (count === selectedBluffPlayerCount) {
-            btn.classList.add("active");
-        } else {
-            btn.classList.remove("active");
-        }
+        btn.classList.toggle("active", count === selectedBluffPlayerCount);
     });
 }
 
@@ -141,16 +125,13 @@ function renderBluffRoundsButtons() {
         button.className = "category-btn";
         button.dataset.rounds = String(rounds);
         button.textContent = `${rounds} جولات`;
-        button.onclick = () => selectBluffRounds(rounds);
-
+        button.onclick = () => {
+            selectedBluffRounds = rounds;
+            updateBluffRoundsButtonsState();
+        };
         container.appendChild(button);
     });
 
-    updateBluffRoundsButtonsState();
-}
-
-function selectBluffRounds(rounds) {
-    selectedBluffRounds = rounds;
     updateBluffRoundsButtonsState();
 }
 
@@ -159,11 +140,14 @@ function updateBluffRoundsButtonsState() {
 
     buttons.forEach((btn) => {
         const rounds = Number(btn.dataset.rounds);
+        const disabledBecauseTooLow = selectedBluffPlayerCount && rounds < selectedBluffPlayerCount;
 
-        if (rounds === selectedBluffRounds) {
-            btn.classList.add("active");
-        } else {
-            btn.classList.remove("active");
+        btn.disabled = !!disabledBecauseTooLow;
+        btn.classList.toggle("disabled", !!disabledBecauseTooLow);
+        btn.classList.toggle("active", rounds === selectedBluffRounds);
+
+        if (disabledBecauseTooLow && rounds === selectedBluffRounds) {
+            selectedBluffRounds = null;
         }
     });
 }
@@ -178,7 +162,6 @@ function toggleBluffCategory(categoryKey) {
             alert(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
             return;
         }
-
         selectedBluffCategories.push(categoryKey);
     }
 
@@ -197,11 +180,7 @@ function updateBluffCategoryButtonsState() {
         const key = btn.dataset.categoryKey;
         const isSelected = selectedBluffCategories.includes(key);
 
-        if (isSelected) {
-            btn.classList.add("active");
-        } else {
-            btn.classList.remove("active");
-        }
+        btn.classList.toggle("active", isSelected);
 
         if (!isSelected && selectedBluffCategories.length >= MAX_CATEGORIES) {
             btn.classList.add("disabled");
@@ -213,10 +192,6 @@ function updateBluffCategoryButtonsState() {
     });
 }
 
-
-/**
- * Show bluff setup screen.
- */
 function showBluffSetup() {
     const name = document.getElementById("bluffName").value.trim();
 
@@ -232,17 +207,11 @@ function showBluffSetup() {
     document.getElementById("screen-bluff-setup").classList.remove("hidden");
 }
 
-/**
- * Return to bluff lobby.
- */
 function goBackToBluffLobby() {
     hideAllBluffScreens();
     document.getElementById("screen-bluff-lobby").classList.remove("hidden");
 }
 
-/**
- * Create a new bluff room.
- */
 async function createBluffRoom() {
     const hostName = document.getElementById("bluffName").value.trim();
     const playerCount = selectedBluffPlayerCount;
@@ -263,15 +232,19 @@ async function createBluffRoom() {
         return;
     }
 
+    if (totalRounds < playerCount) {
+        alert("عدد الجولات يجب أن يكون على الأقل بعدد اللاعبين.");
+        return;
+    }
+
     if (selectedBluffCategories.length === 0) {
         alert("اختر تصنيفاً واحداً على الأقل!");
         return;
     }
 
-
     const response = await fetch("/api/bluff/rooms", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             host_name: hostName,
             player_count: playerCount,
@@ -284,12 +257,6 @@ async function createBluffRoom() {
 
     if (!response.ok) {
         alert(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
-        return;
-    }
-
-    const hostPlayer = data.players.find((player) => player.id === data.host_id);
-    if (!hostPlayer) {
-        alert("تعذر تحديد صاحب الغرفة.");
         return;
     }
 
@@ -307,9 +274,6 @@ async function createBluffRoom() {
     renderBluffWaitingRoom(data);
 }
 
-/**
- * Join an existing bluff room.
- */
 async function joinBluffRoom() {
     const name = document.getElementById("bluffName").value.trim();
     const roomCode = document.getElementById("bluffRoomInput").value.trim().toUpperCase();
@@ -321,7 +285,7 @@ async function joinBluffRoom() {
 
     const response = await fetch(`/api/bluff/rooms/${roomCode}/join`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ player_name: name })
     });
 
@@ -350,9 +314,6 @@ async function joinBluffRoom() {
     renderBluffWaitingRoom(data);
 }
 
-/**
- * Start the bluff game.
- */
 async function startBluffGame() {
     const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/start`, {
         method: "POST"
@@ -372,9 +333,30 @@ async function startBluffGame() {
     renderBluffState(data);
 }
 
-/**
- * Submit bluff answer.
- */
+async function selectBluffRoundCategory(category) {
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/select-category`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            player_id: currentBluffPlayerId,
+            category: category
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        alert(data.detail || "تعذر اختيار التصنيف.");
+        return;
+    }
+
+    currentBluffRoomData = data;
+    bluffIsHost = currentBluffPlayerId === data.host_id;
+    lastRenderedBluffSignature = null;
+
+    renderBluffState(data);
+}
+
 async function submitBluffAnswer() {
     const input = document.getElementById("bluffAnswerInput");
     const answerText = input.value.trim();
@@ -386,7 +368,7 @@ async function submitBluffAnswer() {
 
     const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/submit-answer`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             player_id: currentBluffPlayerId,
             answer_text: answerText
@@ -408,13 +390,10 @@ async function submitBluffAnswer() {
     renderBluffState(data);
 }
 
-/**
- * Submit vote for one option.
- */
-async function submitBluffVote(optionId) {
-    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/vote`, {
+async function submitBluffPick(optionId) {
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/submit-pick`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             player_id: currentBluffPlayerId,
             option_id: optionId
@@ -424,7 +403,7 @@ async function submitBluffVote(optionId) {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر إرسال التصويت.");
+        alert(data.detail || "تعذر إرسال الاختيار.");
         return;
     }
 
@@ -435,13 +414,10 @@ async function submitBluffVote(optionId) {
     renderBluffState(data);
 }
 
-/**
- * Advance to next round (host only).
- */
 async function advanceBluffRound() {
     const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/advance`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             player_id: currentBluffPlayerId
         })
@@ -461,29 +437,27 @@ async function advanceBluffRound() {
     renderBluffState(data);
 }
 
-/**
- * Restart bluff game with same players.
- */
 async function restartBluffGame() {
-    const totalRounds = selectedBluffRounds;
+    const totalRounds = selectedBluffRounds || currentBluffRoomData?.total_rounds;
+    const categories = selectedBluffCategories.length > 0
+        ? selectedBluffCategories
+        : currentBluffRoomData?.categories || [];
 
     if (!totalRounds) {
         alert("اختر عدد الجولات أولاً!");
         return;
     }
 
-    if (selectedBluffCategories.length === 0) {
+    if (categories.length === 0) {
         alert("اختر تصنيفاً واحداً على الأقل!");
         return;
     }
 
-    
-
-    const response = await fetch(`/api/bluff/rooms/${bluffRoomCode}/restart`, {
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/restart`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            categories: selectedBluffCategories,
+            categories,
             total_rounds: totalRounds
         })
     });
@@ -495,15 +469,12 @@ async function restartBluffGame() {
         return;
     }
 
-    bluffRoomData = data;
-    bluffIsHost = bluffPlayerId === data.host_id;
-    bluffLastSignature = null;
+    currentBluffRoomData = data;
+    bluffIsHost = currentBluffPlayerId === data.host_id;
+    lastRenderedBluffSignature = null;
     renderBluffWaitingRoom(data);
 }
 
-/**
- * Leave current room as non-host before game starts.
- */
 async function leaveBluffRoom() {
     if (!currentBluffRoomCode || !currentBluffPlayerId) return;
 
@@ -512,7 +483,7 @@ async function leaveBluffRoom() {
 
     const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/leave`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             player_id: currentBluffPlayerId
         })
@@ -529,9 +500,6 @@ async function leaveBluffRoom() {
     window.location.reload();
 }
 
-/**
- * Delete current room as host.
- */
 async function deleteBluffRoom() {
     if (!currentBluffRoomCode || !currentBluffPlayerId) return;
 
@@ -540,7 +508,7 @@ async function deleteBluffRoom() {
 
     const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/delete`, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             player_id: currentBluffPlayerId
         })
@@ -557,17 +525,11 @@ async function deleteBluffRoom() {
     window.location.reload();
 }
 
-/**
- * Refresh room state from backend.
- */
 async function refreshBluffRoomState() {
     if (!currentBluffRoomCode) return;
 
     const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}`);
-
-    if (!response.ok) {
-        return;
-    }
+    if (!response.ok) return;
 
     const data = await response.json();
     currentBluffRoomData = data;
@@ -575,6 +537,7 @@ async function refreshBluffRoomState() {
 
     const signature = buildBluffStateSignature(data);
     if (signature === lastRenderedBluffSignature) {
+        updateBluffLiveTimer(data);
         return;
     }
 
@@ -582,10 +545,9 @@ async function refreshBluffRoomState() {
     renderBluffState(data);
 }
 
-/**
- * Render current bluff state based on phase.
- */
 function renderBluffState(data) {
+    currentBluffRoomData = data;
+
     if (data.ended || data.phase === "game_over") {
         renderBluffGameOver(data);
         return;
@@ -596,13 +558,18 @@ function renderBluffState(data) {
         return;
     }
 
-    if (data.phase === "writing") {
-        renderBluffWritingPhase(data);
+    if (data.phase === "category_pick") {
+        renderBluffCategoryPickPhase(data);
         return;
     }
 
-    if (data.phase === "voting") {
-        renderBluffVotingPhase(data);
+    if (data.phase === "submission") {
+        renderBluffSubmissionPhase(data);
+        return;
+    }
+
+    if (data.phase === "answer_pick") {
+        renderBluffAnswerPickPhase(data);
         return;
     }
 
@@ -611,9 +578,6 @@ function renderBluffState(data) {
     }
 }
 
-/**
- * Build a lightweight signature to avoid pointless rerenders.
- */
 function buildBluffStateSignature(data) {
     const playersSignature = data.players
         .map((player) => `${player.id}:${player.score}`)
@@ -628,8 +592,14 @@ function buildBluffStateSignature(data) {
         ended: data.ended,
         phase: data.phase,
         current_round: data.current_round,
+        current_category_chooser_id: data.current_category_chooser_id,
+        current_round_category: data.current_round_category,
+        current_question: data.current_question,
         submissions_count: data.submissions_count,
-        votes_count: data.votes_count,
+        picks_count: data.picks_count,
+        submitted_player_ids: data.submitted_player_ids,
+        picked_player_ids: data.picked_player_ids,
+        phase_deadline_at: data.phase_deadline_at,
         last_round_message: data.last_round_message,
         last_round_correct_option_id: data.last_round_correct_option_id,
         winner_ids: data.winner_ids,
@@ -638,9 +608,6 @@ function buildBluffStateSignature(data) {
     });
 }
 
-/**
- * Render waiting room.
- */
 function renderBluffWaitingRoom(data) {
     hideAllBluffScreens();
     document.getElementById("screen-bluff-wait").classList.remove("hidden");
@@ -652,9 +619,7 @@ function renderBluffWaitingRoom(data) {
 
     data.players.forEach((player) => {
         const badge = document.createElement("span");
-        badge.style.background = "#333";
-        badge.style.padding = "5px 10px";
-        badge.style.borderRadius = "5px";
+        badge.className = "player-chip";
         badge.textContent = `${player.name} (${player.score})`;
         playerList.appendChild(badge);
     });
@@ -671,77 +636,119 @@ function renderBluffWaitingRoom(data) {
     }
 }
 
-/**
- * Render writing phase.
- */
-function renderBluffWritingPhase(data) {
+function renderBluffCategoryPickPhase(data) {
     hideAllBluffScreens();
-    document.getElementById("screen-bluff-writing").classList.remove("hidden");
+    document.getElementById("screen-bluff-category-pick").classList.remove("hidden");
 
-    document.getElementById("bluffRoundInfo").textContent =
+    document.getElementById("bluffRoundInfoCategoryPick").textContent =
         `الجولة ${data.current_round} / ${data.total_rounds}`;
 
-    document.getElementById("bluffQuestionBox").textContent = data.current_question;
+    const chooser = data.players.find((p) => p.id === data.current_category_chooser_id);
+    const chooserName = chooser ? chooser.name : "لاعب";
 
+    document.getElementById("bluffCategoryChooserInfo").textContent =
+        data.current_category_chooser_id === currentBluffPlayerId
+            ? "اختر تصنيف هذه الجولة"
+            : `${chooserName} يختار التصنيف الآن`;
+
+    const container = document.getElementById("bluffRoundCategoryGrid");
+    container.innerHTML = "";
+
+    (data.categories || []).forEach((categoryKey) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.textContent = bluffCategoryLabels[categoryKey] || categoryKey;
+        button.disabled = data.current_category_chooser_id !== currentBluffPlayerId;
+        button.onclick = () => selectBluffRoundCategory(categoryKey);
+        container.appendChild(button);
+    });
+
+    renderBluffPlayerStatusList(data, "bluffPlayerStatusCategoryPick", "idle");
+    renderBluffScoreboard(data.players, "bluffScoreboardCategoryPick");
+}
+
+function renderBluffSubmissionPhase(data) {
+    hideAllBluffScreens();
+    document.getElementById("screen-bluff-submission").classList.remove("hidden");
+
+    document.getElementById("bluffRoundInfoSubmission").textContent =
+        `الجولة ${data.current_round} / ${data.total_rounds}`;
+
+    document.getElementById("bluffSubmissionCategoryLabel").textContent =
+        bluffCategoryLabels[data.current_round_category] || data.current_round_category || "-";
+
+    document.getElementById("bluffQuestionBoxSubmission").textContent = data.current_question;
     document.getElementById("bluffSubmissionsInfo").textContent =
         `تم إرسال ${data.submissions_count} من ${data.players.length}`;
 
-    renderBluffScoreboard(data.players, "bluffScoreboardWriting");
+    renderBluffTimer("bluffTimerSubmission", data.phase_deadline_at);
+
+    const mySubmitted = (data.submitted_player_ids || []).includes(currentBluffPlayerId);
+    const answerInput = document.getElementById("bluffAnswerInput");
+    const answerButton = document.getElementById("bluffSubmitAnswerBtn");
+
+    answerInput.disabled = mySubmitted;
+    answerButton.disabled = mySubmitted;
+
+    if (mySubmitted) {
+        answerInput.placeholder = "تم إرسال إجابتك";
+    } else {
+        answerInput.placeholder = "اكتب إجابة خادعة تبدو صحيحة...";
+    }
+
+    renderBluffPlayerStatusList(data, "bluffPlayerStatusSubmission", "submitted");
+    renderBluffScoreboard(data.players, "bluffScoreboardSubmission");
 }
 
-/**
- * Render voting phase.
- */
-function renderBluffVotingPhase(data) {
+function renderBluffAnswerPickPhase(data) {
     hideAllBluffScreens();
-    document.getElementById("screen-bluff-voting").classList.remove("hidden");
+    document.getElementById("screen-bluff-answer-pick").classList.remove("hidden");
 
-    document.getElementById("bluffRoundInfoVoting").textContent =
+    document.getElementById("bluffRoundInfoAnswerPick").textContent =
         `الجولة ${data.current_round} / ${data.total_rounds}`;
 
-    document.getElementById("bluffQuestionBoxVoting").textContent = data.current_question;
+    document.getElementById("bluffAnswerPickCategoryLabel").textContent =
+        bluffCategoryLabels[data.current_round_category] || data.current_round_category || "-";
 
-    document.getElementById("bluffVotesInfo").textContent =
-        `تم التصويت من ${data.votes_count} من ${data.players.length}`;
+    document.getElementById("bluffQuestionBoxAnswerPick").textContent = data.current_question;
+    document.getElementById("bluffPicksInfo").textContent =
+        `تم الاختيار من ${data.picks_count} من ${data.players.length}`;
+
+    renderBluffTimer("bluffTimerAnswerPick", data.phase_deadline_at);
+    renderBluffPlayerStatusList(data, "bluffPlayerStatusAnswerPick", "picked");
 
     const optionsContainer = document.getElementById("bluffOptionsContainer");
     optionsContainer.innerHTML = "";
 
-    const myVote = currentBluffRoomData && currentBluffRoomData.votes
-        ? currentBluffRoomData.votes[currentBluffPlayerId]
-        : null;
+    const myPick = findMyPickFromRoomState(data);
 
     data.answer_options.forEach((option) => {
-        const div = document.createElement("div");
-        div.className = "vote-item";
-
         const isOwnOption = option.author_ids.includes(currentBluffPlayerId);
-        const isSelected = myVote === option.id;
+        const isSelected = myPick === option.id;
 
-        let buttonHtml = "";
-        if (!isOwnOption) {
-            buttonHtml = `
-                <button class="btn-sm ${isSelected ? 'btn-primary' : ''}"
-                        onclick="submitBluffVote('${option.id}')">
-                    ${isSelected ? 'تم التصويت' : 'تصويت'}
-                </button>
-            `;
-        }
+        const button = document.createElement("button");
+        button.className = "bluff-answer-card";
+        button.disabled = isOwnOption;
+        if (isSelected) button.classList.add("selected");
+        if (isOwnOption) button.classList.add("own-answer");
 
-        div.innerHTML = `
-            <span>${option.text}${isOwnOption ? " (إجابتك)" : ""}</span>
-            ${buttonHtml}
+        button.innerHTML = `
+            <div class="bluff-answer-text">${option.text}</div>
+            ${isOwnOption ? '<div class="bluff-answer-meta">إجابتك</div>' : ''}
+            ${isSelected ? '<div class="bluff-answer-meta">تم الاختيار</div>' : ''}
         `;
 
-        optionsContainer.appendChild(div);
+        if (!isOwnOption) {
+            button.onclick = () => submitBluffPick(option.id);
+        }
+
+        optionsContainer.appendChild(button);
     });
 
-    renderBluffScoreboard(data.players, "bluffScoreboardVoting");
+    renderBluffScoreboard(data.players, "bluffScoreboardAnswerPick");
 }
 
-/**
- * Render round result screen.
- */
 function renderBluffRoundResult(data) {
     hideAllBluffScreens();
     document.getElementById("screen-bluff-result").classList.remove("hidden");
@@ -749,42 +756,8 @@ function renderBluffRoundResult(data) {
     document.getElementById("bluffResultMessage").textContent =
         data.last_round_message || "انتهت الجولة.";
 
-    const resultsContainer = document.getElementById("bluffResultsContainer");
-    resultsContainer.innerHTML = "";
-
-    data.answer_options.forEach((option) => {
-        const div = document.createElement("div");
-        div.className = "vote-item";
-
-        let label = option.text;
-        if (option.id === data.last_round_correct_option_id) {
-            label += " ✅";
-        }
-
-        div.innerHTML = `<span>${label} — ${option.votes_received} صوت</span>`;
-        resultsContainer.appendChild(div);
-    });
-
-    const scoreChanges = document.getElementById("bluffScoreChanges");
-    scoreChanges.innerHTML = "";
-
-    const changes = data.last_round_score_changes || {};
-    if (Object.keys(changes).length === 0) {
-        const div = document.createElement("div");
-        div.textContent = "لم يحصل أحد على نقاط في هذه الجولة.";
-        scoreChanges.appendChild(div);
-    } else {
-        Object.entries(changes).forEach(([playerId, delta]) => {
-            const player = data.players.find((p) => p.id === playerId);
-            if (!player) return;
-
-            const div = document.createElement("div");
-            div.textContent = `${player.name}: +${delta}`;
-            scoreChanges.appendChild(div);
-        });
-    }
-
-    renderBluffScoreboard(data.players, "bluffScoreboardResult");
+    renderBluffAnswersResultTable(data);
+    renderBluffRankingResultTable(data);
 
     const advanceArea = document.getElementById("bluffAdvanceArea");
     advanceArea.innerHTML = "";
@@ -804,9 +777,75 @@ function renderBluffRoundResult(data) {
     }
 }
 
-/**
- * Render final screen.
- */
+function renderBluffAnswersResultTable(data) {
+    const tbody = document.getElementById("bluffAnswersTableBody");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    (data.answer_options || []).forEach((option) => {
+        const row = document.createElement("tr");
+
+        const authorNames = (option.author_ids || []).length > 0
+            ? option.author_ids
+                .map((authorId) => {
+                    const player = data.players.find((p) => p.id === authorId);
+                    return player ? player.name : "لاعب غير معروف";
+                })
+                .join(" / ")
+            : "الإجابة الصحيحة✅";
+
+
+        if (option.id === data.last_round_correct_option_id) {
+            row.classList.add("correct-answer-row");
+        }
+
+        row.innerHTML = `
+            <td>${escapeHtml(option.text)}</td>
+            <td>${escapeHtml(authorNames)}</td>
+            <td>${option.votes_received ?? 0}</td>
+        `;
+
+        tbody.appendChild(row);
+    });
+}
+
+function renderBluffRankingResultTable(data) {
+    const tbody = document.getElementById("bluffRankingTableBody");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    const changes = data.last_round_score_changes || {};
+    const sortedPlayers = [...data.players].sort((a, b) => b.score - a.score);
+
+    sortedPlayers.forEach((player, index) => {
+        const row = document.createElement("tr");
+        const delta = changes[player.id] || 0;
+
+        if (index === 0) row.classList.add("rank-gold");
+        if (index === 1) row.classList.add("rank-silver");
+        if (index === 2) row.classList.add("rank-bronze");
+
+        row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${escapeHtml(player.name)}</td>
+            <td>${player.score}</td>
+            <td>${delta > 0 ? `+${delta}` : "-"}</td>
+        `;
+
+        tbody.appendChild(row);
+    });
+}
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function renderBluffGameOver(data) {
     hideAllBluffScreens();
     document.getElementById("screen-bluff-game-over").classList.remove("hidden");
@@ -819,7 +858,7 @@ function renderBluffGameOver(data) {
             ? `انتهت اللعبة! تعادل بين: ${winnerNames}`
             : `الفائز هو: ${winnerNames}`;
 
-    renderBluffScoreboard(data.players, "bluffScoreboardFinal");
+    renderBluffScoreboard(data.players, "bluffScoreboardFinal", true);
 
     const adminArea = document.getElementById("bluffGameOverAdminArea");
     const memberArea = document.getElementById("bluffGameOverMemberArea");
@@ -833,38 +872,92 @@ function renderBluffGameOver(data) {
     }
 }
 
-/**
- * Render scoreboard into a container.
- */
-function renderBluffScoreboard(players, containerId) {
+function renderBluffPlayerStatusList(data, containerId, mode) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const submittedIds = new Set(data.submitted_player_ids || []);
+    const pickedIds = new Set(data.picked_player_ids || []);
+
+    container.innerHTML = "";
+
+    data.players.forEach((player) => {
+        const item = document.createElement("div");
+        item.className = "player-status-chip";
+
+        let dimmed = false;
+        if (mode === "submitted") dimmed = submittedIds.has(player.id);
+        if (mode === "picked") dimmed = pickedIds.has(player.id);
+
+        if (dimmed) item.classList.add("done");
+        if (player.id === data.current_category_chooser_id && data.phase === "category_pick") {
+            item.classList.add("current-turn");
+        }
+
+        item.textContent = player.name;
+        container.appendChild(item);
+    });
+}
+
+function renderBluffScoreboard(players, containerId, withPodium = false) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
     container.innerHTML = "";
 
-    [...players]
-        .sort((a, b) => b.score - a.score)
-        .forEach((player) => {
-            const badge = document.createElement("span");
-            badge.style.background = "#333";
-            badge.style.padding = "5px 10px";
-            badge.style.borderRadius = "5px";
-            badge.textContent = `${player.name}: ${player.score}`;
-            container.appendChild(badge);
-        });
+    const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+
+    sortedPlayers.forEach((player, index) => {
+        const badge = document.createElement("span");
+        badge.className = "player-chip";
+
+        if (withPodium || containerId === "bluffScoreboardResult") {
+            if (index === 0) badge.classList.add("podium-gold");
+            if (index === 1) badge.classList.add("podium-silver");
+            if (index === 2) badge.classList.add("podium-bronze");
+        }
+
+        badge.textContent = `${player.name}: ${player.score}`;
+        container.appendChild(badge);
+    });
 }
 
-/**
- * Reset local state and reload page.
- */
+function renderBluffTimer(elementId, deadlineAt) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+
+    if (!deadlineAt) {
+        el.textContent = "";
+        return;
+    }
+
+    const now = Date.now() / 1000;
+    const secondsLeft = Math.max(0, Math.ceil(deadlineAt - now));
+    el.textContent = `${secondsLeft} ثانية`;
+}
+
+function updateBluffLiveTimer(data) {
+    if (!data) return;
+
+    if (data.phase === "submission") {
+        renderBluffTimer("bluffTimerSubmission", data.phase_deadline_at);
+    }
+
+    if (data.phase === "answer_pick") {
+        renderBluffTimer("bluffTimerAnswerPick", data.phase_deadline_at);
+    }
+}
+
+function findMyPickFromRoomState(data) {
+    if (!data?.picks || !currentBluffPlayerId) return null;
+    return data.picks[currentBluffPlayerId] || null;
+}
+
 function resetBluffAndExit() {
     clearBluffLocalState();
     window.location.reload();
 }
 
-/**
- * Clear bluff local storage + memory state.
- */
 function clearBluffLocalState() {
     localStorage.removeItem("bluff_room_code");
     localStorage.removeItem("bluff_player_id");
@@ -881,33 +974,32 @@ function clearBluffLocalState() {
     selectedBluffCategories = [];
 }
 
-/**
- * Hide all bluff screens.
- */
 function hideAllBluffScreens() {
     const screens = [
         "screen-bluff-lobby",
         "screen-bluff-setup",
         "screen-bluff-wait",
-        "screen-bluff-writing",
-        "screen-bluff-voting",
+        "screen-bluff-category-pick",
+        "screen-bluff-submission",
+        "screen-bluff-answer-pick",
         "screen-bluff-result",
         "screen-bluff-game-over"
     ];
 
     screens.forEach((id) => {
         const el = document.getElementById(id);
-        if (el) {
-            el.classList.add("hidden");
-        }
+        if (el) el.classList.add("hidden");
     });
 }
 
-/**
- * Poll room state every few seconds.
- */
 setInterval(async () => {
     if (currentBluffRoomCode && currentBluffPlayerId) {
         await refreshBluffRoomState();
     }
 }, 3000);
+
+setInterval(() => {
+    if (currentBluffRoomData) {
+        updateBluffLiveTimer(currentBluffRoomData);
+    }
+}, 1000);

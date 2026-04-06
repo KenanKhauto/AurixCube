@@ -4,14 +4,23 @@
 
 {% block content %}
 <div class="card glow-border games-page-card" style="margin-top: 30px;">
-    <h1 style="color:var(--primary); text-shadow: var(--glow);">بوابة الألعاب</h1>
-    <p style="color:#aaa;">اختر اللعبة التي تريد الدخول إليها</p>
+    <div class="games-header">
+        <div class="games-title-row">
+            <img src="/static/images/card-image.png" class="games-icon" alt="AurixCube Icon">
+            <div class="games-text">
+                <h1 class="games-title">AURIXCUBE</h1>
+                <p class="games-subtitle">اختر اللعبة التي تريد الدخول إليها</p>
+            </div>
+        </div>
+
+        <img src="/static/images/amro-line.png" class="games-divider" alt="divider">
+    </div>
 
     <div class="games-grid">
         {% for game in games %}
             <a href="{{ game.path }}" class="game-link">
                 <div class="game-option {{ game.get('outline_class', '') }} {% if game.get('disabled') %}disabled-opt{% endif %}">
-                    <img src="{{ game.logo }}" class="game-logo" />
+                    <img src="{{ game.logo }}" class="game-logo" alt="{{ game.name }}">
                     {% if game.get('coming_soon') %}
                         <div class="cs-tag">Coming Soon</div>
                     {% endif %}

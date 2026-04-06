@@ -5,16 +5,17 @@ from fastapi import APIRouter, HTTPException
 from app.games.bluff.constants import BLUFF_CATEGORIES
 from app.games.bluff.schemas import (
     BluffAdvanceRoundRequest,
+    BluffAnswerOptionView,
     BluffCreateRoomRequest,
     BluffDeleteRoomRequest,
     BluffJoinRoomRequest,
     BluffLeaveRoomRequest,
+    BluffPlayerView,
     BluffRestartGameRequest,
     BluffRoomStateResponse,
+    BluffSelectCategoryRequest,
     BluffSubmitAnswerRequest,
-    BluffSubmitVoteRequest,
-    BluffAnswerOptionView,
-    BluffPlayerView,
+    BluffSubmitPickRequest,
 )
 from app.games.bluff.service import BluffGameService
 
@@ -35,13 +36,17 @@ def build_room_response(room) -> BluffRoomStateResponse:
         winner_ids=room.winner_ids,
         current_round=room.current_round,
         phase=room.phase,
+        current_category_chooser_id=room.current_category_chooser_id,
+        current_round_category=room.current_round_category,
         current_question=room.current_question,
+        phase_deadline_at=room.phase_deadline_at,
         submissions_count=len(room.submissions),
-        votes_count=len(room.votes),
+        picks_count=len(room.picks),
+        submitted_player_ids=list(room.submissions.keys()),
+        picked_player_ids=list(room.picks.keys()),
         last_round_message=room.last_round_message,
         last_round_correct_option_id=room.last_round_correct_option_id,
         last_round_score_changes=room.last_round_score_changes,
-        votes=room.votes,
         players=[
             BluffPlayerView(
                 id=player.id,
@@ -57,16 +62,18 @@ def build_room_response(room) -> BluffRoomStateResponse:
                 is_correct=option.is_correct,
                 author_ids=option.author_ids,
                 votes_received=option.votes_received,
+                is_bot_generated=option.is_bot_generated,
             )
             for option in room.answer_options
         ],
+        picks=room.picks,
     )
 
 
 @router.get("/categories")
 def get_categories():
     """Return available Bluff categories."""
-    return {"categories": BLUFF_CATEGORIES}
+    return {"categories": list(BLUFF_CATEGORIES.keys())}
 
 
 @router.post("/rooms", response_model=BluffRoomStateResponse)
@@ -77,8 +84,8 @@ def create_room(payload: BluffCreateRoomRequest):
             host_name=payload.host_name,
             player_count=payload.player_count,
             total_rounds=payload.total_rounds,
-            categories=payload.categories,        
-            )
+            categories=payload.categories,
+        )
         return build_room_response(room)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -114,6 +121,16 @@ def get_room(room_code: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.post("/rooms/{room_code}/select-category", response_model=BluffRoomStateResponse)
+def select_category(room_code: str, payload: BluffSelectCategoryRequest):
+    """Chooser selects the round category."""
+    try:
+        room = service.select_category(room_code, payload.player_id, payload.category)
+        return build_room_response(room)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/rooms/{room_code}/submit-answer", response_model=BluffRoomStateResponse)
 def submit_answer(room_code: str, payload: BluffSubmitAnswerRequest):
     """Submit a bluff answer."""
@@ -124,11 +141,11 @@ def submit_answer(room_code: str, payload: BluffSubmitAnswerRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/rooms/{room_code}/vote", response_model=BluffRoomStateResponse)
-def vote(room_code: str, payload: BluffSubmitVoteRequest):
-    """Submit or replace a vote."""
+@router.post("/rooms/{room_code}/submit-pick", response_model=BluffRoomStateResponse)
+def submit_pick(room_code: str, payload: BluffSubmitPickRequest):
+    """Submit or replace a picked answer."""
     try:
-        room = service.submit_vote(room_code, payload.player_id, payload.option_id)
+        room = service.submit_pick(room_code, payload.player_id, payload.option_id)
         return build_room_response(room)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

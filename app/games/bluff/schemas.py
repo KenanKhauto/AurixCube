@@ -10,12 +10,17 @@ from pydantic import BaseModel, Field
 class BluffCreateRoomRequest(BaseModel):
     host_name: str
     player_count: int = Field(..., ge=2, le=10)
-    total_rounds: int = Field(..., ge=1, le=10)
-    categories: list[str]
+    total_rounds: int = Field(..., ge=1, le=20)
+    categories: List[str]
 
 
 class BluffJoinRoomRequest(BaseModel):
     player_name: str
+
+
+class BluffSelectCategoryRequest(BaseModel):
+    player_id: str
+    category: str
 
 
 class BluffSubmitAnswerRequest(BaseModel):
@@ -23,7 +28,7 @@ class BluffSubmitAnswerRequest(BaseModel):
     answer_text: str
 
 
-class BluffSubmitVoteRequest(BaseModel):
+class BluffSubmitPickRequest(BaseModel):
     player_id: str
     option_id: str
 
@@ -33,8 +38,8 @@ class BluffAdvanceRoundRequest(BaseModel):
 
 
 class BluffRestartGameRequest(BaseModel):
-    categories: list[str]
-    total_rounds: int = Field(..., ge=1, le=10)
+    categories: List[str]
+    total_rounds: int = Field(..., ge=1, le=20)
 
 
 class BluffLeaveRoomRequest(BaseModel):
@@ -57,25 +62,37 @@ class BluffAnswerOptionView(BaseModel):
     is_correct: bool
     author_ids: List[str]
     votes_received: int
+    is_bot_generated: bool
 
 
 class BluffRoomStateResponse(BaseModel):
     room_code: str
     host_id: str
-    categories: list[str]
     player_count: int
     total_rounds: int
+    categories: List[str]
+
     started: bool
     ended: bool
     winner_ids: List[str]
+
     current_round: int
     phase: str
+
+    current_category_chooser_id: Optional[str]
+    current_round_category: str
     current_question: str
+    phase_deadline_at: Optional[float]
+
     submissions_count: int
-    votes_count: int
+    picks_count: int
+    submitted_player_ids: List[str]
+    picked_player_ids: List[str]
+
     last_round_message: Optional[str]
     last_round_correct_option_id: Optional[str]
     last_round_score_changes: Dict[str, int]
+
     players: List[BluffPlayerView]
     answer_options: List[BluffAnswerOptionView]
-    votes: Dict[str, str]
+    picks: Dict[str, str] = {}

@@ -19,33 +19,40 @@ class BluffAnswerOption:
     is_correct: bool = False
     author_ids: List[str] = field(default_factory=list)
     votes_received: int = 0
+    is_bot_generated: bool = False
 
 
 @dataclass
 class BluffRoom:
     room_code: str
     host_id: str
-    categories: list[str]
     player_count: int
     total_rounds: int
+    categories: List[str]
 
     started: bool = False
     ended: bool = False
     winner_ids: List[str] = field(default_factory=list)
 
     current_round: int = 1
-    phase: str = "waiting"  # waiting | writing | voting | round_result | game_over
+    phase: str = "waiting"  # waiting | category_pick | submission | answer_pick | round_result | game_over
+
+    chooser_order: List[str] = field(default_factory=list)
+    current_category_chooser_id: Optional[str] = None
+    current_round_category: str = ""
 
     current_question: str = ""
     correct_answer: str = ""
-    used_prompt_indices: List[int] = field(default_factory=list)
+    used_prompt_keys: List[str] = field(default_factory=list)
+
+    phase_deadline_at: Optional[float] = None  # unix timestamp
 
     players: Dict[str, BluffPlayer] = field(default_factory=dict)
     scores: Dict[str, int] = field(default_factory=dict)
 
-    submissions: Dict[str, str] = field(default_factory=dict)
+    submissions: Dict[str, str] = field(default_factory=dict)  # player_id -> submitted bluff text
     answer_options: List[BluffAnswerOption] = field(default_factory=list)
-    votes: Dict[str, str] = field(default_factory=dict)  # voter_id -> option_id
+    picks: Dict[str, str] = field(default_factory=dict)  # player_id -> option_id
 
     last_round_message: Optional[str] = None
     last_round_correct_option_id: Optional[str] = None

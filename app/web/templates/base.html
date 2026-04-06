@@ -3,65 +3,59 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block title %}بوابة الألعاب{% endblock %}</title>
+    <title>AurixCube</title>
+    <link rel="icon" type="image/x-icon" href="static/images/main_logo.png">
     <link rel="stylesheet" href="/static/css/style.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
 <header class="navbar">
     <div class="nav-container">
-        <div class="logo" onclick="goHome()">
-            <img src="/static/images/main_logo.png" class="nav-logo">
-             ArcadiaHub
+
+        <!-- LEFT -->
+        <div class="nav-right">
+            <a href="/login" class="nav-link {% if request.url.path == '/login' %}active-nav{% endif %}">
+                <img src="/static/images/login-logo.png" class="nav-img">
+            </a>
         </div>
 
-        <nav class="nav-links" id="desktopNav">
+        <!-- CENTER -->
+        <div class="nav-center">
             <a href="/" class="nav-link {% if request.url.path == '/' %}active-nav{% endif %}">
-                 الرئيسية <i class="fas fa-house"></i>
+                <img src="/static/images/home-logo.png" class="nav-img">
             </a>
 
             <a href="/games" class="nav-link {% if request.url.path.startswith('/games') %}active-nav{% endif %}">
-                 الألعاب <i class="fas fa-gamepad"></i>
+                <img src="/static/images/games-logo.png" class="nav-img">
             </a>
 
             <a href="/about" class="nav-link {% if request.url.path == '/about' %}active-nav{% endif %}">
-                 حول <i class="fas fa-circle-info"></i>
+                <img src="/static/images/about-logo.png" class="nav-img">
             </a>
+        </div>
 
-            {% if request.session.get("user_id") %}
-                <a href="/profile" class="nav-link {% if request.url.path == '/profile' %}active-nav{% endif %}">
-                    
-                    <span class="nav-user">
-                        أهلاً، {{ current_user.display_name or current_user.username }}
-                    </span>
-                    <i class="fas fa-user"></i>
-                </a>
-            {% else %}
-                <a href="/login" class="nav-link {% if request.url.path == '/login' %}active-nav{% endif %}">
-                     تسجيل الدخول <i class="fas fa-right-to-bracket"></i>
-                </a>
-            {% endif %}
+        <!-- RIGHT -->
+        <div class="nav-left">
+            <div class="logo" onclick="goHome()">
+                <img src="/static/images/main_logo.png" class="nav-logo">
+            </div>
+        </div>
 
-            <span class="nav-indicator" id="navIndicator"></span>
-        </nav>
-
-        <div class="menu-toggle" onclick="toggleMenu()">☰</div>
     </div>
 
     <div id="mobileMenu" class="mobile-menu hidden">
-        <a href="/" class="{% if request.url.path == '/' %}active-nav{% endif %}"> الرئيسية</a>
-        <a href="/games" class="{% if request.url.path.startswith('/games') %}active-nav{% endif %}"> الألعاب</a>
-        <a href="/about" class="{% if request.url.path == '/about' %}active-nav{% endif %}"> حول</a>
+        <a href="/" class="{% if request.url.path == '/' %}active-nav{% endif %}">Home</a>
+        <a href="/games" class="{% if request.url.path.startswith('/games') %}active-nav{% endif %}">Games</a>
+        <a href="/about" class="{% if request.url.path == '/about' %}active-nav{% endif %}">About</a>
 
         {% if request.session.get("user_id") %}
             <a href="/profile" class="{% if request.url.path == '/profile' %}active-nav{% endif %}">
-                <span class="nav-user">
-                    أهلاً، {{ current_user.display_name or current_user.username }}
-                </span>
+                Hi, {{ current_user.display_name or current_user.username }}
             </a>
         {% else %}
-            <a href="/login" class="{% if request.url.path == '/login' %}active-nav{% endif %}">تسجيل الدخول</a>
+            <a href="/login" class="{% if request.url.path == '/login' %}active-nav{% endif %}">Login</a>
         {% endif %}
     </div>
 </header>
@@ -72,8 +66,14 @@
 
 <footer class="site-footer">
     <div class="footer-container">
-        <div class="footer-left">
-            ArcadiaHub <br> All rights reserved © {{ current_year or 2026 }}
+        <div class="footer-right">
+            <div class="footer-brand">
+                <img src="/static/images/main_logo.png" class="footer-logo">
+                <div>
+                    AurixCube <br>
+                    All rights reserved © {{ current_year or 2026 }}
+                </div>
+            </div>
         </div>
 
         <div class="footer-right">
@@ -109,7 +109,6 @@ function setupNavIndicator() {
 
         const navRect = nav.getBoundingClientRect();
         const targetRect = target.getBoundingClientRect();
-
         const rightOffset = navRect.right - targetRect.right;
 
         indicator.style.width = `${targetRect.width}px`;
