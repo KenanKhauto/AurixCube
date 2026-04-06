@@ -35,6 +35,11 @@ const bluffCategoryLabels = {
     general: "معلومات عامة",
     strange_facts: "معلومات غريبة",
     islam: "إسلاميات",
+    history: "تاريخ",
+    animals: "حيوانات",
+    proverbs: "أمثال شامية",
+    player_career: "مسيرة لاعب",
+
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
