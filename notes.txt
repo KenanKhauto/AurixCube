@@ -2,3 +2,6 @@
 - change the sytle of the game make it schöner
 - add avatars for each players selection
 - Choose your avatar, in create, joing room.
+- mobile style anpassen
+- Arcadiahub to AurixCube everywhere
+- Login system zabet.
