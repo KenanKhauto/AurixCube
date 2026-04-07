@@ -30,6 +30,7 @@ class BluffRoom:
     player_count: int
     total_rounds: int
     categories: List[str]
+    round_timer_seconds: int = 30
 
     started: bool = False
     ended: bool = False

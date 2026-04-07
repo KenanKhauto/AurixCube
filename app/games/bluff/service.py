@@ -33,11 +33,15 @@ class BluffGameService:
         player_count: int,
         total_rounds: int,
         categories: list[str],
+        round_timer_seconds: int,
     ) -> BluffRoom:
         categories = self._validate_categories(categories)
 
         if total_rounds < player_count:
             raise ValueError("Total rounds must be at least the number of players.")
+        
+        if round_timer_seconds not in {30, 60, 90}:
+            raise ValueError("Round timer must be 30, 60, or 90 seconds.")
 
         room_code = generate_room_code()
         host_id = str(uuid.uuid4())
@@ -48,6 +52,7 @@ class BluffGameService:
             categories=categories,
             player_count=player_count,
             total_rounds=total_rounds,
+            round_timer_seconds=round_timer_seconds,
         )
 
         room.players[host_id] = BluffPlayer(id=host_id, name=host_name, character_id=character_id)
@@ -155,7 +160,7 @@ class BluffGameService:
         room.current_question = prompt["question"]
         room.correct_answer = prompt["answer"]
         room.phase = "submission"
-        room.phase_deadline_at = time.time() + SUBMISSION_DURATION_SECONDS
+        room.phase_deadline_at = time.time() + room.round_timer_seconds
 
         self._save_room(room)
         return room
@@ -239,13 +244,15 @@ class BluffGameService:
         self._save_room(room)
         return room
 
-    def restart_game(self, room_code: str, categories: list[str], total_rounds: int) -> BluffRoom:
+    def restart_game(self, room_code: str, categories: list[str], total_rounds: int, round_timer_seconds: int,) -> BluffRoom:
         room = self._get_room(room_code)
 
         categories = self._validate_categories(categories)
 
         if total_rounds < len(room.players):
             raise ValueError("Total rounds must be at least the number of players.")
+        if round_timer_seconds not in {30, 60, 90}:
+            raise ValueError("Round timer must be 30, 60, or 90 seconds.")
 
         room.categories = categories
         room.total_rounds = total_rounds
@@ -267,6 +274,7 @@ class BluffGameService:
         room.last_round_message = None
         room.last_round_correct_option_id = None
         room.last_round_score_changes = {}
+        room.round_timer_seconds = round_timer_seconds
 
         for player_id in room.players:
             room.scores[player_id] = 0
@@ -292,7 +300,7 @@ class BluffGameService:
     def _start_answer_pick_phase(self, room: BluffRoom) -> None:
         self._build_answer_options(room)
         room.phase = "answer_pick"
-        room.phase_deadline_at = time.time() + PICK_DURATION_SECONDS
+        room.phase_deadline_at = time.time() + room.round_timer_seconds
 
     def _build_answer_options(self, room: BluffRoom) -> None:
         """
@@ -498,6 +506,7 @@ class BluffGameService:
             "last_round_message": room.last_round_message,
             "last_round_correct_option_id": room.last_round_correct_option_id,
             "last_round_score_changes": room.last_round_score_changes,
+            "round_timer_seconds": room.round_timer_seconds,
             "players": {
                 player_id: {
                     "id": player.id,
@@ -544,6 +553,7 @@ class BluffGameService:
             last_round_message=data.get("last_round_message"),
             last_round_correct_option_id=data.get("last_round_correct_option_id"),
             last_round_score_changes=data.get("last_round_score_changes", {}),
+            round_timer_seconds=data.get("round_timer_seconds", 30),
         )
 
         for player_id, player_data in data.get("players", {}).items():

@@ -13,6 +13,7 @@ class BluffCreateRoomRequest(BaseModel):
     player_count: int = Field(..., ge=2, le=10)
     total_rounds: int = Field(..., ge=1, le=20)
     categories: List[str]
+    round_timer_seconds: int = Field(30, ge=30, le=90)
 
 
 class BluffJoinRoomRequest(BaseModel):
@@ -41,6 +42,7 @@ class BluffAdvanceRoundRequest(BaseModel):
 class BluffRestartGameRequest(BaseModel):
     categories: List[str]
     total_rounds: int = Field(..., ge=1, le=20)
+    round_timer_seconds: int = Field(30, ge=30, le=90)
 
 
 class BluffLeaveRoomRequest(BaseModel):
@@ -78,6 +80,8 @@ class BluffRoomStateResponse(BaseModel):
     ended: bool
     winner_ids: List[str]
 
+    round_timer_seconds: int
+    
     current_round: int
     phase: str
 

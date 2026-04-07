@@ -24,12 +24,18 @@ let selectedBluffPlayerCount = null;
 let selectedBluffRounds = null;
 let selectedBluffCategories = [];
 const MAX_CATEGORIES = 12;
+let selectedBluffRoundTimer = 30;
+const bluffRoundTimerOptions = [
+    { value: 30, label: "30 ثانية" },
+    { value: 60, label: "60 ثانية" },
+    { value: 90, label: "90 ثانية" },
+];
 
 let selectedBluffCharacter = localStorage.getItem("bluff_character_id") || "char1";
 const bluffCharacterOptions = Array.from({ length: 12 }, (_, i) => `char${i + 1}`);
 
 const bluffPlayerCountOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
-const bluffRoundsOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+const bluffRoundsOptions = [2, 5, 10, 15, 20, 25, 30];
 
 const bluffCategoryLabels = {
     capitals: "دول",
@@ -49,6 +55,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderBluffRoundsButtons();
     await loadBluffCategories();
     renderBluffCharacterButtons();
+    renderBluffRoundTimerButtons();
 
     if (currentBluffPlayerName) {
         const nameInput = document.getElementById("bluffName");
@@ -64,6 +71,40 @@ document.addEventListener("DOMContentLoaded", async () => {
         await refreshBluffRoomState();
     }
 });
+
+
+function renderBluffRoundTimerButtons() {
+    const container = document.getElementById("bluffTimerGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    bluffRoundTimerOptions.forEach((option) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.timerValue = String(option.value);
+        button.textContent = option.label;
+        button.onclick = () => selectBluffRoundTimer(option.value);
+        container.appendChild(button);
+    });
+
+    updateBluffRoundTimerButtonsState();
+}
+
+function selectBluffRoundTimer(seconds) {
+    selectedBluffRoundTimer = seconds;
+    updateBluffRoundTimerButtonsState();
+}
+
+function updateBluffRoundTimerButtonsState() {
+    const buttons = document.querySelectorAll("#bluffTimerGrid .category-btn");
+
+    buttons.forEach((btn) => {
+        const value = Number(btn.dataset.timerValue);
+        btn.classList.toggle("active", value === selectedBluffRoundTimer);
+    });
+}
 
 function renderBluffCharacterButtons() {
     const container = document.getElementById("bluffCharacterGrid");
@@ -334,7 +375,8 @@ async function createBluffRoom() {
             character_id: selectedBluffCharacter,
             player_count: playerCount,
             total_rounds: totalRounds,
-            categories: selectedBluffCategories
+            categories: selectedBluffCategories,
+            round_timer_seconds: selectedBluffRoundTimer
         })
     });
 
@@ -546,7 +588,8 @@ async function restartBluffGame() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             categories,
-            total_rounds: totalRounds
+            total_rounds: totalRounds,
+            round_timer_seconds: selectedBluffRoundTimer || currentBluffRoomData?.round_timer_seconds || 30
         })
     });
 
