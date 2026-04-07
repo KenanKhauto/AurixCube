@@ -13,11 +13,12 @@ let selectedPlayerCount = null;
 const playerCountOptions = [2, 3, 4, 5, 6, 7, 8];
 
 const categoryLabels = {
-    football_players: "لاعبين كرة قدم ⚽",
-    countries: "دول 🌍",
-    animals: "حيوانات 🐾",
-    cartoon_characters: "شخصيات كرتون 🎬",
-    historical_figures: "شخصيات تاريخية 📜"
+    football_players: "لاعبين كرة قدم",
+    countries: "دول",
+    animals: "حيوانات",
+    cartoon_characters: "شخصيات كرتون",
+    football_clubs: "أندية كرة القدم",
+    vegetables_and_fruits: "خضار وفواكه",
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
