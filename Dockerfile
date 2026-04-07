@@ -8,12 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps first for layer caching.
-# torch + sentence-transformers: use CPU-only PyTorch index to avoid
-# pulling the ~2 GB CUDA build (this is a CPU-only homelab server).
 COPY requirements.txt .
-RUN pip install --no-cache-dir \
-    --extra-index-url https://download.pytorch.org/whl/cpu \
-    -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
