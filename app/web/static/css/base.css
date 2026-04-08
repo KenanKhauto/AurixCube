@@ -1,4 +1,6 @@
 :root {
+    --font-base: 'Tajawal', sans-serif;
+
     --bg: #0d0d0d;
     --card: #1a1a1a;
     --surface: #222222;
@@ -30,8 +32,15 @@ body {
     min-height: 100%;
 }
 
+body,
+button,
+input,
+select,
+textarea {
+    font-family: var(--font-base);
+}
+
 body {
-    font-family: Arial, sans-serif;
     background: url("/static/images/web_background.png") no-repeat center center fixed;
     background-size: cover;
     color: var(--text);

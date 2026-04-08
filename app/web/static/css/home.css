@@ -38,7 +38,6 @@
 
 .games-title {
     margin: 0;
-    font-family: 'Cinzel', serif;
     font-size: 30px;
     font-weight: 700;
     letter-spacing: 1.5px;
@@ -168,6 +167,16 @@
 
 .game-outline-whoami:hover {
     box-shadow: 0 0 24px rgba(210, 213, 46, 0.24);
+}
+
+.game-outline-draw-guess {
+    border-color: #de4c39;
+    background: linear-gradient(180deg, rgba(222, 76, 57, 0.08), rgba(255, 255, 255, 0.04));
+    box-shadow: 0 0 18px rgba(222, 76, 57, 0.22);
+}
+
+.game-outline-draw-guess:hover {
+    box-shadow: 0 0 26px rgba(222, 76, 57, 0.35);
 }
 
 .cs-tag {

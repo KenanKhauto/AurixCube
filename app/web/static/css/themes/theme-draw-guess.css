@@ -1,4 +1,34 @@
 .theme-draw-guess {
-    --primary: #ffb347; /* warm gold/orange */
-    --glow: 0 0 15px rgba(255, 179, 71, 0.4);
+    --game-accent: #de4c39;
+    --game-accent-soft: rgba(222, 76, 57, 0.18);
+    --game-accent-strong: rgba(222, 76, 57, 0.30);
+    --game-shadow: 0 0 18px rgba(222, 76, 57, 0.28);
+
+    --primary: #ffb347;
+    --glow: 0 0 18px rgba(255, 179, 71, 0.4);
+
+    --error-bg: rgba(222, 76, 57, 0.08);
+    --error-border: rgba(222, 76, 57, 0.22);
+}
+
+.theme-draw-guess .card {
+    border-color: var(--game-accent);
+}
+
+.theme-draw-guess .game-header-logo,
+.theme-draw-guess .game-title-box {
+    box-shadow: 0 0 18px rgba(222, 76, 57, 0.2);
+}
+
+.theme-draw-guess .btn-primary {
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.03),
+        rgba(0, 0, 0, 0.2)
+    );
+    border-color: var(--game-accent);
+}
+
+.theme-draw-guess .btn-primary:hover {
+    box-shadow: 0 0 16px rgba(222, 76, 57, 0.28);
 }
