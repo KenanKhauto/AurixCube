@@ -15,11 +15,11 @@ const whoAmICharacterOptions = Array.from({ length: 12 }, (_, i) => `char${i + 1
 const playerCountOptions = [2, 3, 4, 5, 6, 7, 8];
 
 const categoryLabels = {
-    football_players: "لاعبين كرة قدم ⚽",
-    countries: "دول 🌍",
-    animals: "حيوانات 🐾",
-    cartoon_characters: "شخصيات كرتون 🎬",
-    historical_figures: "شخصيات تاريخية 📜"
+    football_players: "لاعبين كرة قدم",
+    countries: "دول",
+    animals: "حيوانات",
+    cartoon_characters: "شخصيات كرتون",
+    historical_figures: "شخصيات تاريخية"
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -672,14 +672,14 @@ function renderPlayScreen(data) {
     if (me && me.has_guessed_correctly && cachedIdentity) {
         identityElement.textContent = `هويتك: ${cachedIdentity}`;
     } else if (me && me.has_guessed_correctly) {
-        identityElement.textContent = "تم حل هويتك ✅";
+        identityElement.textContent = "تم حل هويتك";
     } else {
         identityElement.textContent = "هويتك ما زالت مخفية";
     }
 
     const guessArea = document.getElementById("guessArea");
     if (me && me.has_guessed_correctly) {
-        guessArea.innerHTML = `<p style="color:#aaa;">لقد خمنت هويتك بشكل صحيح. يمكنك متابعة اللعبة كمشاهد 👀</p>`;
+        guessArea.innerHTML = `<p style="color:#aaa;">لقد خمنت هويتك بشكل صحيح. يمكنك متابعة اللعبة كمشاهد</p>`;
         currentGuessDraft = "";
     } else if (data.current_turn_player_id === currentPlayerId) {
         guessArea.innerHTML = `
@@ -739,7 +739,7 @@ function renderPlayersState(data) {
 
     const rows = sortedPlayers.map((player) => {
         const statusText = player.has_guessed_correctly
-            ? "خمن بشكل صحيح ✅"
+            ? "خمن بشكل صحيح"
             : "لم يخمن بعد";
 
         const identityText = player.visible_identity
@@ -786,7 +786,7 @@ function renderGameOver(data) {
     if (data.end_reason === "insufficient_players") {
         document.getElementById("finalMsg").textContent = "انتهت اللعبة! عدد اللاعبين غير كافي للمتابعة.";
     } else {
-        document.getElementById("finalMsg").textContent = "تمكن جميع اللاعبين من معرفة هوياتهم 🎉";
+        document.getElementById("finalMsg").textContent = "تمكن جميع اللاعبين من معرفة هوياتهم";
     }
 
     renderRankingTable(data);
@@ -874,3 +874,17 @@ setInterval(async () => {
         await refreshRoomState();
     }
 }, 3000);
+
+setInterval(async () => {
+    if (currentRoomCode && currentPlayerId) {
+        try {
+            await fetch(`/api/who-am-i/rooms/${currentRoomCode}/heartbeat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ player_id: currentPlayerId })
+            });
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+}, 10000);

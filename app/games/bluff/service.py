@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 import time
 import uuid
+from datetime import datetime
 from typing import Dict, List, Optional
 
 from app.core.exceptions import PlayerNotFoundError, RoomNotFoundError
@@ -100,6 +101,12 @@ class BluffGameService:
         self._save_room(room)
         return room
 
+    def heartbeat(self, room_code: str, player_id: str) -> None:
+        room = self._get_room(room_code)
+        if player_id in room.players:
+            room.players[player_id].last_seen = datetime.now()
+            self._save_room(room)
+
     def delete_room(self, room_code: str, player_id: str) -> None:
         room = self._get_room(room_code)
 
@@ -136,8 +143,23 @@ class BluffGameService:
         self._save_room(room)
         return room
 
+    def _cleanup_inactive_players(self, room: BluffRoom) -> None:
+        now = datetime.now()
+        inactive_player_ids = [
+            pid for pid, player in room.players.items()
+            if (now - player.last_seen).total_seconds() > 60  # 1 minute
+        ]
+        for pid in inactive_player_ids:
+            del room.players[pid]
+            room.scores.pop(pid, None)
+        if inactive_player_ids and not room.players:
+            self.room_repository.delete_room(room.room_code)
+        elif inactive_player_ids and room.started and not self._has_sufficient_players(room):
+            self._end_game_insufficient_players(room)
+
     def get_room_state(self, room_code: str) -> BluffRoom:
         room = self._get_room(room_code)
+        self._cleanup_inactive_players(room)
         self._apply_timeouts(room)
         self._save_room(room)
         return room

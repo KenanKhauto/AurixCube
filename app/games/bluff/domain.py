@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, List, Optional
 
 
@@ -11,6 +12,7 @@ class BluffPlayer:
     id: str
     name: str
     character_id: str = "char1" # the icon image
+    last_seen: datetime = field(default_factory=datetime.now)
 
 
 @dataclass

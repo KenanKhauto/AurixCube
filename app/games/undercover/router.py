@@ -155,3 +155,13 @@ def delete_room(room_code: str, payload: DeleteRoomRequest):
         return {"message": "Room deleted successfully."}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rooms/{room_code}/heartbeat")
+def heartbeat(room_code: str, payload: LeaveRoomRequest):
+    """Update player's last seen timestamp."""
+    try:
+        service.heartbeat(room_code, payload.player_id)
+        return {"message": "Heartbeat received."}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

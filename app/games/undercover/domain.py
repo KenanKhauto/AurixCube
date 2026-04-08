@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, List, Optional
 
 
@@ -17,6 +18,7 @@ class Player:
     secret_word: str = ""
     is_undercover: bool = False
     is_eliminated: bool = False
+    last_seen: datetime = field(default_factory=datetime.now)
 
 
 @dataclass

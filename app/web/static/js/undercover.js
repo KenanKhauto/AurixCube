@@ -25,13 +25,13 @@ const playerCountOptions = [3, 4, 5, 6, 7, 8, 9, 10];
 const undercoverCountOptions = [1, 2, 3, 4];
 
 const categoryLabels = {
-    cars: "سيارات 🚗",
-    countries: "دول 🌍",
-    syrian_food: "أكلات سورية 🍲",
-    football_players: "لاعبين كره قدم ⚽",
-    football_teams: "فرق كره قدم 🏆",
-    capitals: "عواصم 🏛️",
-    syrian_series: "مسلسلات سورية 📺"
+    cars: "سيارات",
+    countries: "دول",
+    syrian_food: "أكلات سورية",
+    football_players: "لاعبين كره قدم",
+    football_teams: "فرق كره قدم",
+    capitals: "عواصم",
+    syrian_series: "مسلسلات سورية"
 };
 
 /**
@@ -592,7 +592,7 @@ function renderPlayScreen(data) {
     if (isHost) {
         const deleteButton = document.createElement("button");
         deleteButton.className = "btn";
-        deleteButton.textContent = "حذف الغرفة 🗑️";
+        deleteButton.textContent = "حذف الغرفة";
         deleteButton.onclick = deleteCurrentRoom;
         playActions.appendChild(deleteButton);
     }
@@ -840,7 +840,7 @@ function renderGameOver(data) {
     if (data.end_reason === "insufficient_players") {
         finalMsg.textContent = "انتهت اللعبة! عدد اللاعبين غير كافي للمتابعة.";
     } else if (data.winner === "players") {
-        finalMsg.textContent = "كفو! تم كشف جميع المندسين بنجاح ✅";
+        finalMsg.textContent = "كفو! تم كشف جميع المندسين بنجاح";
     } else {
         finalMsg.textContent = "انتهت اللعبة! أصبح عدد المندسين مساوياً أو أكبر من الأبرياء.";
     }
@@ -919,3 +919,17 @@ setInterval(async () => {
         await refreshRoomState();
     }
 }, 3000);
+
+setInterval(async () => {
+    if (currentRoomCode && currentPlayerId) {
+        try {
+            await fetch(`/api/undercover/rooms/${currentRoomCode}/heartbeat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ player_id: currentPlayerId })
+            });
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+}, 10000);

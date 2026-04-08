@@ -177,6 +177,16 @@ def delete_room(room_code: str, payload: DrawGuessDeleteRoomRequest):
         return {"message": "Room deleted successfully."}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rooms/{room_code}/heartbeat")
+def heartbeat(room_code: str, payload: DrawGuessLeaveRoomRequest):
+    """Update player's last seen timestamp."""
+    try:
+        service.heartbeat(room_code, payload.player_id)
+        return {"message": "Heartbeat received."}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     
 @router.websocket("/ws/{room_code}")
 async def websocket_endpoint(websocket: WebSocket, room_code: str):
@@ -187,6 +197,10 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
             data = await websocket.receive_json()
 
             event_type = data.get("type")
+
+            # Store player_id association
+            if "player_id" in data:
+                manager.player_websockets[data["player_id"]] = websocket
 
             # DRAW EVENT
             if event_type == "draw":
@@ -234,5 +248,14 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                     "type": "clear"
                 })
 
+            # LEAVE EVENT
+            elif event_type == "leave":
+                room = service.leave_room(room_code, data["player_id"])
+                # Optionally broadcast that player left
+                await manager.broadcast(room_code, {
+                    "type": "player_left",
+                    "player_id": data["player_id"]
+                })
+
     except WebSocketDisconnect:
-        manager.disconnect(room_code, websocket)
+        manager.disconnect(room_code, websocket, service)

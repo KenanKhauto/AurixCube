@@ -943,7 +943,7 @@ function renderBluffAnswersResultTable(data) {
                     return player ? player.name : "لاعب غير معروف";
                 })
                 .join(" / ")
-            : "الإجابة الصحيحة✅";
+            : "الإجابة الصحيحة";
 
 
         if (option.id === data.last_round_correct_option_id) {
@@ -1187,6 +1187,20 @@ setInterval(async () => {
         await refreshBluffRoomState();
     }
 }, 3000);
+
+setInterval(async () => {
+    if (currentBluffRoomCode && currentBluffPlayerId) {
+        try {
+            await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/heartbeat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ player_id: currentBluffPlayerId })
+            });
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+}, 10000);  // every 10 seconds
 
 setInterval(() => {
     if (currentBluffRoomData) {

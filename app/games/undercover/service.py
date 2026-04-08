@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import uuid
+from datetime import datetime
 from typing import Dict, List, Optional
 
 from app.core.exceptions import InvalidVoteError, PlayerNotFoundError, RoomNotFoundError
@@ -112,6 +113,12 @@ class UndercoverGameService:
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
+    def heartbeat(self, room_code: str, player_id: str) -> None:
+        room = self._get_room(room_code)
+        if player_id in room.players:
+            room.players[player_id].last_seen = datetime.now()
+            self.room_repository.save_room(room_code, self._serialize_room(room))
+
     def delete_room(self, room_code: str, player_id: str) -> None:
         """
         Allow the host to delete the room at any time.
@@ -125,6 +132,19 @@ class UndercoverGameService:
         room.end_reason = "host_deleted"
         self.room_repository.save_room(room_code, self._serialize_room(room))
         self.room_repository.delete_room(room_code)
+
+    def _cleanup_inactive_players(self, room: UndercoverRoom) -> None:
+        now = datetime.now()
+        inactive_player_ids = [
+            pid for pid, player in room.players.items()
+            if (now - player.last_seen).total_seconds() > 60  # 1 minute
+        ]
+        for pid in inactive_player_ids:
+            del room.players[pid]
+        if inactive_player_ids and not room.players:
+            self.room_repository.delete_room(room.room_code)
+        elif inactive_player_ids and room.started and not self._has_sufficient_players(room):
+            self._end_game_insufficient_players(room)
 
     def start_game(self, room_code: str) -> UndercoverRoom:
         """
@@ -173,7 +193,9 @@ class UndercoverGameService:
         """
         Retrieve current room state.
         """
-        return self._get_room(room_code)
+        room = self._get_room(room_code)
+        self._cleanup_inactive_players(room)
+        return room
 
     def get_player_secret(self, room_code: str, player_id: str) -> Dict[str, str]:
         """

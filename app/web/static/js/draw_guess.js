@@ -321,7 +321,22 @@ function connectDrawWS(roomCode) {
         if (data.type === "clear") {
             clearCanvasLocally();
         }
+
+        if (data.type === "player_left") {
+            // Handle player left, maybe refresh room state
+            refreshDrawRoomState();
+        }
     };
+
+    // Send leave message on page unload
+    window.addEventListener('beforeunload', () => {
+        if (drawWS && drawWS.readyState === WebSocket.OPEN) {
+            drawWS.send(JSON.stringify({
+                type: 'leave',
+                player_id: currentDrawPlayerId
+            }));
+        }
+    });
 }
 
 function sendDrawWSMessage(payload) {
@@ -1050,7 +1065,7 @@ function renderDrawPlayersState(data) {
             statusText = "يرسم الآن";
             rowClass = "draw-player-current-row";
         } else if (guessedCorrectly) {
-            statusText = "خمن بشكل صحيح ✅";
+            statusText = "خمن بشكل صحيح";
             rowClass = "draw-player-done-row";
         }
 
@@ -1074,7 +1089,7 @@ function renderDrawGuessMessage(data, isInitial = false) {
 
     if (data.is_correct) {
         div.classList.add("correct");
-        div.textContent = `${data.player_name} guessed correctly! ✅`;
+        div.textContent = `${data.player_name} guessed correctly!`;
     } else {
         div.textContent = `${data.player_name}: ${data.text}`;
     }
@@ -1320,6 +1335,20 @@ setInterval(async () => {
         await refreshDrawRoomState();
     }
 }, 3000);
+
+setInterval(async () => {
+    if (currentDrawRoomCode && currentDrawPlayerId) {
+        try {
+            await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/heartbeat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ player_id: currentDrawPlayerId })
+            });
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+}, 10000);
 
 setInterval(() => {
     if (currentDrawRoomData) {

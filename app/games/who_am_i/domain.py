@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, List, Optional
 
 
@@ -19,6 +20,7 @@ class WhoAmIPlayer:
     guess_count: int = 0
     solved_order: Optional[int] = None
     character_id: str = "char1"
+    last_seen: datetime = field(default_factory=datetime.now)
 
 
 @dataclass
