@@ -32,6 +32,7 @@ class WhoAmIRoom:
     player_count: int
     started: bool = False
     ended: bool = False
+    end_reason: Optional[str] = None  # e.g., "game_completed", "insufficient_players", "host_deleted"
 
     reveal_phase_active: bool = False
     reveal_order: List[str] = field(default_factory=list)

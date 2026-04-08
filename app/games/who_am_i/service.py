@@ -83,7 +83,7 @@ class WhoAmIService:
 
     def leave_room(self, room_code: str, player_id: str) -> Optional[WhoAmIRoom]:
         """
-        Allow a non-host player to leave before the game starts.
+        Allow a non-host player to leave at any time.
         """
         room = self._get_room(room_code)
 
@@ -91,10 +91,7 @@ class WhoAmIService:
             raise PlayerNotFoundError("Player not found.")
 
         if player_id == room.host_id:
-            raise ValueError("Host cannot leave the room. Host must delete the room.")
-
-        if room.started:
-            raise ValueError("Players cannot leave after the game has started.")
+            raise ValueError("Hosts cannot leave. Use delete-room instead.")
 
         del room.players[player_id]
 
@@ -102,18 +99,25 @@ class WhoAmIService:
             self.room_repository.delete_room(room_code)
             return None
 
+        # Check for insufficient players after someone leaves
+        if room.started and not self._has_sufficient_players(room):
+            self._end_game_insufficient_players(room)
+
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
     def delete_room(self, room_code: str, player_id: str) -> None:
         """
-        Allow the host to delete the room completely.
+        Allow the host to delete the room at any time.
         """
         room = self._get_room(room_code)
 
         if player_id != room.host_id:
             raise ValueError("Only the host can delete the room.")
 
+        room.ended = True
+        room.end_reason = "host_deleted"
+        self.room_repository.save_room(room_code, self._serialize_room(room))
         self.room_repository.delete_room(room_code)
 
     def start_game(self, room_code: str) -> WhoAmIRoom:
@@ -383,6 +387,15 @@ class WhoAmIService:
             room.turn_number += 1
 
         room.current_turn_player_id = room.active_turn_order[next_index]
+
+    def _has_sufficient_players(self, room: WhoAmIRoom) -> bool:
+        """Check if the game can continue with the current number of players."""
+        return len(room.players) >= 2
+
+    def _end_game_insufficient_players(self, room: WhoAmIRoom) -> None:
+        """End the game due to insufficient players."""
+        room.ended = True
+        room.end_reason = "insufficient_players"
 
     def _get_room(self, room_code: str) -> WhoAmIRoom:
         """

@@ -393,6 +393,7 @@ async function showRevealScreen() {
     cachedSecretWord = data.secret_word;
 
     switchScreen("screen-reveal");
+    updateUndercoverRoomActionButtons();
 
     const wordBox = document.getElementById("mondasWord");
     wordBox.textContent = cachedSecretWord;
@@ -559,6 +560,7 @@ function renderWaitingRoom(data) {
         memberArea.classList.remove("hidden");
         waitMsg.classList.remove("hidden");
     }
+    updateUndercoverRoomActionButtons();
 }
 
 /**
@@ -596,6 +598,16 @@ function renderPlayScreen(data) {
     }
 
     renderVoters(data);
+    updateUndercoverRoomActionButtons();
+}
+
+function updateUndercoverRoomActionButtons() {
+    document.querySelectorAll(".room-leave-button").forEach((button) => {
+        button.classList.toggle("hidden", isHost);
+    });
+    document.querySelectorAll(".room-delete-button").forEach((button) => {
+        button.classList.toggle("hidden", !isHost);
+    });
 }
 
 /**
@@ -824,7 +836,10 @@ function renderGameOver(data) {
 
     const finalMsg = document.getElementById("final-msg");
 
-    if (data.winner === "players") {
+    // Handle insufficient players
+    if (data.end_reason === "insufficient_players") {
+        finalMsg.textContent = "انتهت اللعبة! عدد اللاعبين غير كافي للمتابعة.";
+    } else if (data.winner === "players") {
         finalMsg.textContent = "كفو! تم كشف جميع المندسين بنجاح ✅";
     } else {
         finalMsg.textContent = "انتهت اللعبة! أصبح عدد المندسين مساوياً أو أكبر من الأبرياء.";

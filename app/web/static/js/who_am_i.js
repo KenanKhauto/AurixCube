@@ -591,6 +591,7 @@ function renderWaitingRoom(data) {
         document.getElementById("memberArea").classList.remove("hidden");
         document.getElementById("waitMsg").classList.remove("hidden");
     }
+    updateWhoAmIRoomActionButtons();
 }
 
 async function renderRevealScreen(data) {
@@ -631,6 +632,7 @@ async function renderRevealScreen(data) {
     } else {
         nextRevealBtn.classList.add("hidden");
     }
+    updateWhoAmIRoomActionButtons();
 }
 
 function handleGuessDraftChange() {
@@ -696,6 +698,16 @@ function renderPlayScreen(data) {
     }
 
     renderPlayersState(data);
+    updateWhoAmIRoomActionButtons();
+}
+
+function updateWhoAmIRoomActionButtons() {
+    document.querySelectorAll(".room-leave-button").forEach((button) => {
+        button.classList.toggle("hidden", isHost);
+    });
+    document.querySelectorAll(".room-delete-button").forEach((button) => {
+        button.classList.toggle("hidden", !isHost);
+    });
 }
 
 function renderPlayersState(data) {
@@ -770,7 +782,12 @@ function renderGameOver(data) {
     hideAll();
     document.getElementById("screen-game-over").classList.remove("hidden");
 
-    document.getElementById("finalMsg").textContent = "تمكن جميع اللاعبين من معرفة هوياتهم 🎉";
+    // Handle insufficient players
+    if (data.end_reason === "insufficient_players") {
+        document.getElementById("finalMsg").textContent = "انتهت اللعبة! عدد اللاعبين غير كافي للمتابعة.";
+    } else {
+        document.getElementById("finalMsg").textContent = "تمكن جميع اللاعبين من معرفة هوياتهم 🎉";
+    }
 
     renderRankingTable(data);
 

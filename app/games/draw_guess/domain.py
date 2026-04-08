@@ -53,6 +53,7 @@ class DrawGuessRoom:
 
     started: bool = False
     ended: bool = False
+    end_reason: Optional[str] = None  # e.g., "game_completed", "insufficient_players", "host_deleted"
     winner_ids: List[str] = field(default_factory=list)
 
     current_round: int = 1

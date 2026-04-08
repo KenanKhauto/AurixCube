@@ -16,7 +16,7 @@ GAMES = [
         "id": "undercover",
         "name": "لعبة المندس",
         "description": "لعبة جماعية فيها مندس أو أكثر، مع تصويت وكشف النتيجة.",
-        "path": "/games/undercover",
+        "path": "#",
         "coming_soon": True,
         "disabled": True,
         "outline_class": "game-outline-undercover",

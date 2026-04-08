@@ -57,11 +57,11 @@
 
         <div id="bluffHostArea" class="hidden">
             <button class="btn btn-primary" onclick="startBluffGame()">ابدأ اللعبة الآن 🔥</button>
-            <button class="btn" onclick="deleteBluffRoom()">حذف الغرفة 🗑️</button>
+            <button class="btn room-delete-button" onclick="deleteBluffRoom()">حذف الغرفة 🗑️</button>
         </div>
 
         <div id="bluffMemberArea" class="hidden">
-            <button class="btn" onclick="leaveBluffRoom()">خروج من الغرفة 🚪</button>
+            <button class="btn room-leave-button" onclick="leaveBluffRoom()">خروج من الغرفة 🚪</button>
         </div>
 
         <p style="color:#666">بانتظار أن يبدأ المنظم اللعب...</p>
@@ -97,6 +97,11 @@
                     </thead>
                     <tbody id="bluffScoreboardCategoryPick"></tbody>
                 </table>
+            </div>
+
+            <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+                <button class="btn room-leave-button" onclick="leaveBluffRoom()">خروج من الغرفة 🚪</button>
+                <button class="btn room-delete-button" onclick="deleteBluffRoom()">حذف الغرفة 🗑️</button>
             </div>
         </div>
 
@@ -137,6 +142,11 @@
                     <tbody id="bluffScoreboardSubmission"></tbody>
                 </table>
             </div>
+
+            <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+                <button class="btn room-leave-button" onclick="leaveBluffRoom()">خروج من الغرفة 🚪</button>
+                <button class="btn room-delete-button" onclick="deleteBluffRoom()">حذف الغرفة 🗑️</button>
+            </div>
         </div>
 
         <div id="screen-bluff-answer-pick" class="card hidden">
@@ -176,6 +186,11 @@
                     <tbody id="bluffScoreboardAnswerPick"></tbody>
                 </table>
             </div>
+
+            <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+                <button class="btn room-leave-button" onclick="leaveBluffRoom()">خروج من الغرفة 🚪</button>
+                <button class="btn room-delete-button" onclick="deleteBluffRoom()">حذف الغرفة 🗑️</button>
+            </div>
         </div>
 
         <div id="screen-bluff-result" class="card hidden bluff-result-card">
@@ -213,6 +228,11 @@
         </div>
 
         <div id="bluffAdvanceArea" style="margin-top:20px;"></div>
+
+        <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+            <button class="btn room-leave-button" onclick="leaveBluffRoom()">خروج من الغرفة 🚪</button>
+            <button class="btn room-delete-button" onclick="deleteBluffRoom()">حذف الغرفة 🗑️</button>
+        </div>
     </div>
 
     <div id="screen-bluff-game-over" class="card hidden">

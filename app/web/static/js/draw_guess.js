@@ -851,10 +851,6 @@ function buildDrawStateSignature(data) {
         .map((p) => `${p.id}:${p.score}`)
         .join("|");
 
-    const guessesSignature = (data.guesses || [])
-        .map((g) => `${g.player_id}:${g.text}:${g.is_correct}`)
-        .join("|");
-
     return JSON.stringify({
         started: data.started,
         ended: data.ended,
@@ -866,8 +862,7 @@ function buildDrawStateSignature(data) {
         last_round_word_en: data.last_round_word_en,
         last_round_word_ar: data.last_round_word_ar,
         last_round_score_changes: data.last_round_score_changes,
-        players: playersSignature,
-        guesses: guessesSignature
+        players: playersSignature
     });
 }
 
@@ -876,27 +871,41 @@ function renderDrawState(data) {
 
     if (data.ended || data.phase === "game_over") {
         renderDrawGameOver(data);
+        updateDrawRoomActionButtons();
         return;
     }
 
     if (!data.started || data.phase === "waiting") {
         renderDrawWaitingRoom(data);
+        updateDrawRoomActionButtons();
         return;
     }
 
     if (data.phase === "word_choice") {
         renderDrawWordChoice(data);
+        updateDrawRoomActionButtons();
         return;
     }
 
     if (data.phase === "drawing") {
         renderDrawPlay(data);
+        updateDrawRoomActionButtons();
         return;
     }
 
     if (data.phase === "round_result") {
         renderDrawRoundResult(data);
+        updateDrawRoomActionButtons();
     }
+}
+
+function updateDrawRoomActionButtons() {
+    document.querySelectorAll(".draw-room-leave").forEach((button) => {
+        button.classList.toggle("hidden", drawIsHost);
+    });
+    document.querySelectorAll(".draw-room-delete").forEach((button) => {
+        button.classList.toggle("hidden", !drawIsHost);
+    });
 }
 
 function buildDrawPlayerIdentity(player) {
@@ -1137,6 +1146,37 @@ function renderDrawGameOver(data) {
     hideAllDrawScreens();
     document.getElementById("screen-draw-game-over").classList.remove("hidden");
 
+    // Handle insufficient players
+    if (data.end_reason === "insufficient_players") {
+        document.getElementById("drawFinalMsg").textContent = 
+            "انتهت اللعبة! عدد اللاعبين غير كافي للمتابعة.";
+        
+        const tbody = document.getElementById("drawFinalScoreboard");
+        tbody.innerHTML = "";
+
+        [...data.players]
+            .sort((a, b) => b.score - a.score)
+            .forEach((player, index) => {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${buildDrawPlayerIdentity(player)}</td>
+                    <td>${player.score}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        
+        if (drawIsHost) {
+            document.getElementById("drawGameOverAdminArea").classList.remove("hidden");
+            document.getElementById("drawGameOverMemberArea").classList.add("hidden");
+        } else {
+            document.getElementById("drawGameOverAdminArea").classList.add("hidden");
+            document.getElementById("drawGameOverMemberArea").classList.remove("hidden");
+        }
+        return;
+    }
+
+    // Normal game over
     const winners = data.players.filter((player) => data.winner_ids.includes(player.id));
     const winnerNames = winners.map((player) => player.name).join(" / ");
 

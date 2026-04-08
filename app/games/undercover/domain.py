@@ -32,6 +32,7 @@ class UndercoverRoom:
     undercover_count: int
     started: bool = False
     ended: bool = False
+    end_reason: Optional[str] = None  # e.g., "game_completed", "insufficient_players", "host_deleted"
     winner: Optional[str] = None
     players: Dict[str, Player] = field(default_factory=dict)
     votes: Dict[str, List[str]] = field(default_factory=dict)

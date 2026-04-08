@@ -84,10 +84,7 @@ class BluffGameService:
             raise PlayerNotFoundError("Player not found.")
 
         if player_id == room.host_id:
-            raise ValueError("Host cannot leave the room. Host must delete the room.")
-
-        if room.started:
-            raise ValueError("Players cannot leave after the game has started.")
+            raise ValueError("Hosts cannot leave. Use delete-room instead.")
 
         del room.players[player_id]
         room.scores.pop(player_id, None)
@@ -95,6 +92,10 @@ class BluffGameService:
         if not room.players:
             self.room_repository.delete_room(room_code)
             return None
+
+        # Check for insufficient players after someone leaves
+        if room.started and not self._has_sufficient_players(room):
+            self._end_game_insufficient_players(room)
 
         self._save_room(room)
         return room
@@ -105,6 +106,9 @@ class BluffGameService:
         if player_id != room.host_id:
             raise ValueError("Only the host can delete the room.")
 
+        room.ended = True
+        room.end_reason = "host_deleted"
+        self._save_room(room)
         self.room_repository.delete_room(room_code)
 
     def start_game(self, room_code: str) -> BluffRoom:
@@ -393,6 +397,17 @@ class BluffGameService:
             for player_id, score in room.scores.items()
             if score == max_score
         ]
+
+    def _has_sufficient_players(self, room: BluffRoom) -> bool:
+        """Check if the game can continue with the current number of players."""
+        return len(room.players) >= 2
+
+    def _end_game_insufficient_players(self, room: BluffRoom) -> None:
+        """End the game due to insufficient players."""
+        room.ended = True
+        room.end_reason = "insufficient_players"
+        room.phase = "game_over"
+        room.phase_deadline_at = None
 
     def _apply_timeouts(self, room: BluffRoom) -> None:
         if room.phase_deadline_at is None:

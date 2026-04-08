@@ -683,32 +683,47 @@ function renderBluffState(data) {
 
     if (data.ended || data.phase === "game_over") {
         renderBluffGameOver(data);
+        updateBluffRoomActionButtons();
         return;
     }
 
     if (!data.started || data.phase === "waiting") {
         renderBluffWaitingRoom(data);
+        updateBluffRoomActionButtons();
         return;
     }
 
     if (data.phase === "category_pick") {
         renderBluffCategoryPickPhase(data);
+        updateBluffRoomActionButtons();
         return;
     }
 
     if (data.phase === "submission") {
         renderBluffSubmissionPhase(data);
+        updateBluffRoomActionButtons();
         return;
     }
 
     if (data.phase === "answer_pick") {
         renderBluffAnswerPickPhase(data);
+        updateBluffRoomActionButtons();
         return;
     }
 
     if (data.phase === "round_result") {
         renderBluffRoundResult(data);
+        updateBluffRoomActionButtons();
     }
+}
+
+function updateBluffRoomActionButtons() {
+    document.querySelectorAll(".room-leave-button").forEach((button) => {
+        button.classList.toggle("hidden", bluffIsHost);
+    });
+    document.querySelectorAll(".room-delete-button").forEach((button) => {
+        button.classList.toggle("hidden", !bluffIsHost);
+    });
 }
 
 function buildBluffStateSignature(data) {
@@ -985,6 +1000,27 @@ function renderBluffGameOver(data) {
     hideAllBluffScreens();
     document.getElementById("screen-bluff-game-over").classList.remove("hidden");
 
+    // Handle insufficient players
+    if (data.end_reason === "insufficient_players") {
+        document.getElementById("bluffFinalMsg").textContent = 
+            "انتهت اللعبة! عدد اللاعبين غير كافي للمتابعة.";
+        
+        renderBluffScoreboard(data.players, "bluffScoreboardFinal", true);
+        
+        const adminArea = document.getElementById("bluffGameOverAdminArea");
+        const memberArea = document.getElementById("bluffGameOverMemberArea");
+
+        if (bluffIsHost) {
+            adminArea.classList.remove("hidden");
+            memberArea.classList.add("hidden");
+        } else {
+            adminArea.classList.add("hidden");
+            memberArea.classList.remove("hidden");
+        }
+        return;
+    }
+
+    // Normal game over
     const winners = data.players.filter((player) => data.winner_ids.includes(player.id));
     const winnerNames = winners.map((player) => player.name).join(" / ");
 
