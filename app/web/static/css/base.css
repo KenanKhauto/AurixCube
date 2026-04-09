@@ -1,30 +1,29 @@
 :root {
     --font-base: 'Tajawal', sans-serif;
+    --font-display: 'Cinzel', 'Tajawal', serif;
 
-    --bg: #0d0d0d;
-    --card: #1a1a1a;
-    --surface: #222222;
-    --input-bg: #000000;
+    --bg: #0b0907;
+    --bg-soft: #15110d;
+    --panel: rgba(22, 18, 14, 0.92);
+    --panel-strong: rgba(18, 14, 10, 0.96);
+    --panel-soft: rgba(40, 32, 24, 0.72);
 
-    --text: #ffffff;
-    --muted: #aaaaaa;
-    --border: #333333;
+    --text: #f5ead7;
+    --muted: #b7a58a;
 
-    --brand-gold: #FFC857;
-    --brand-gold-strong: #FFD700;
-    --brand-gold-deep: #FFB300;
-    --brand-glow: 0 0 15px rgba(255, 200, 80, 0.45);
+    --border: rgba(201, 164, 92, 0.22);
+    --border-strong: rgba(212, 176, 104, 0.5);
+
+    --brand-gold: #d6b06a;
+    --brand-gold-strong: #f0d18a;
+    --brand-gold-deep: #8d6a31;
+
+    --shadow-dark: 0 18px 40px rgba(0, 0, 0, 0.45);
+    --shadow-gold: 0 0 18px rgba(214, 176, 106, 0.18);
+    --shadow-inner: inset 0 1px 0 rgba(255, 230, 180, 0.05),
+                    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
 
     --page-padding: 40px;
-
-    /* Default theme values; overridden by .theme-* classes */
-    --game-accent: #FFC857;
-    --game-accent-soft: rgba(255, 200, 80, 0.16);
-    --game-accent-strong: rgba(255, 200, 80, 0.28);
-    --game-shadow: 0 0 16px rgba(255, 200, 80, 0.24);
-
-    --error-bg: rgba(255, 255, 255, 0.08);
-    --error-border: rgba(255, 255, 255, 0.22);
 }
 
 html,
@@ -54,13 +53,42 @@ body {
     z-index: 0;
 }
 
+body {
+    background:
+        linear-gradient(rgba(7, 5, 4, 0.62), rgba(7, 5, 4, 0.78)),
+        url("/static/images/web_background.png") no-repeat center center fixed;
+    background-size: cover;
+    color: var(--text);
+    direction: rtl;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    position: relative;
+    z-index: 0;
+}
+
 body::before {
     content: "";
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.55);
+    background:
+        radial-gradient(circle at top center, rgba(255, 214, 140, 0.06), transparent 35%),
+        radial-gradient(circle at bottom center, rgba(0, 0, 0, 0.32), transparent 45%);
+    z-index: -2;
+    pointer-events: none;
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+        linear-gradient(to bottom, rgba(0,0,0,0.32), rgba(0,0,0,0.52));
+    backdrop-filter: blur(1.5px);
     z-index: -1;
-    backdrop-filter: blur(1px);
+    pointer-events: none;
 }
 
 .main-content {

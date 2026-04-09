@@ -1,33 +1,42 @@
-{% extends "base.html" %}
+{% extends "base.html" %} 
 
-{% block title %}بوابة الألعاب{% endblock %}
+{% block title %}بوابة الألعاب{% endblock %} 
 
 {% block content %}
-<div class="card glow-border games-page-card" style="margin-top: 30px;">
-    <div class="games-header">
-        <img src="/static/images/main_logo_home.png" class="games-icon" alt="AurixCube Icon">
 
-    <div class="games-text">
+<div class="games-hero">
 
-        <p class="games-subtitle">اختر اللعبة التي تريد الدخول إليها</p>
-    </div>
+    <!-- 🔥 FLOATING LOGO -->
+    <img src="/static/images/main_logo_home.png"
+         class="games-hero-logo"
+         alt="AurixCube Icon">
 
-    </div>
+    <!-- CARD -->
+    <div class="card glow-border games-page-card">
 
-    <div class="games-grid">
-        {% for game in games %}
-            <a href="{{ game.path }}" class="game-link">
-                <div class="game-option {{ game.get('outline_class', '') }} {% if game.get('disabled') %}disabled-opt{% endif %}">
-                    <img src="{{ game.logo }}" class="game-logo" alt="{{ game.name }}">
-                    {% if game.get('coming_soon') %}
-                        <div class="cs-tag">Coming Soon</div>
-                    {% endif %}
+        <div class="games-header">
+            <div class="games-text">
+                <p class="games-subtitle">اختر اللعبة التي تريد الدخول إليها</p>
+            </div>
+        </div>
 
-                    <h3 class="game-title">{{ game.name }}</h3>
-                    <p class="game-description">{{ game.description }}</p>
-                </div>
-            </a>
-        {% endfor %}
+        <div class="games-grid">
+            {% for game in games %}
+                <a href="{{ game.path }}" class="game-link">
+                    <div class="game-option {{ game.get('outline_class', '') }} {% if game.get('disabled') %}disabled-opt{% endif %}">
+                        <img src="{{ game.logo }}" class="game-logo" alt="{{ game.name }}">
+
+                        {% if game.get('coming_soon') %}
+                            <div class="cs-tag">Coming Soon</div>
+                        {% endif %}
+
+                        <h3 class="game-title">{{ game.name }}</h3>
+                        <p class="game-description">{{ game.description }}</p>
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+
     </div>
 </div>
 {% endblock %}

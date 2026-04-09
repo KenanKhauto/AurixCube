@@ -14,48 +14,55 @@
 <header class="navbar">
     <div class="nav-container">
 
+        <!-- MOBILE MENU BUTTON -->
+        <button class="menu-toggle" type="button" onclick="toggleMenu()" aria-label="Open menu">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
         <!-- LEFT -->
-        <div class="nav-right">
+        <div class="nav-left">
             <a href="/login" class="nav-link {% if request.url.path == '/login' %}active-nav{% endif %}">
-                <img src="/static/images/login-logo.png" class="nav-img">
+                <img src="/static/images/login-logo.png" class="nav-img" alt="Login">
             </a>
         </div>
 
         <!-- CENTER -->
-        <div class="nav-center">
+        <div class="nav-center" id="desktopNav">
             <a href="/" class="nav-link {% if request.url.path == '/' %}active-nav{% endif %}">
-                <img src="/static/images/home-logo.png" class="nav-img">
+                <img src="/static/images/home-logo.png" class="nav-img" alt="Home">
             </a>
 
             <a href="/games" class="nav-link {% if request.url.path.startswith('/games') %}active-nav{% endif %}">
-                <img src="/static/images/games-logo.png" class="nav-img">
+                <img src="/static/images/games-logo.png" class="nav-img" alt="Games">
             </a>
 
             <a href="/about" class="nav-link {% if request.url.path == '/about' %}active-nav{% endif %}">
-                <img src="/static/images/about-logo.png" class="nav-img">
+                <img src="/static/images/about-logo.png" class="nav-img" alt="About">
             </a>
+
+            <div class="nav-indicator" id="navIndicator"></div>
         </div>
 
         <!-- RIGHT -->
-        <div class="nav-left">
+        <div class="nav-right">
             <div class="logo">
-                <img src="/static/images/main_logo.png" class="nav-logo">
+                <img src="/static/images/main_logo.png" class="nav-logo" alt="AurixCube">
             </div>
         </div>
 
     </div>
 
     <div id="mobileMenu" class="mobile-menu hidden">
-        <a href="/" class="{% if request.url.path == '/' %}active-nav{% endif %}">Home</a>
-        <a href="/games" class="{% if request.url.path.startswith('/games') %}active-nav{% endif %}">Games</a>
-        <a href="/about" class="{% if request.url.path == '/about' %}active-nav{% endif %}">About</a>
+        <a href="/" class="{% if request.url.path == '/' %}active-nav{% endif %}">الرئيسية</a>
+        <a href="/games" class="{% if request.url.path.startswith('/games') %}active-nav{% endif %}">الألعاب</a>
+        <a href="/about" class="{% if request.url.path == '/about' %}active-nav{% endif %}">حول</a>
 
         {% if request.session.get("user_id") %}
             <a href="/profile" class="{% if request.url.path == '/profile' %}active-nav{% endif %}">
-                Hi, {{ current_user.display_name or current_user.username }}
+                {{ current_user.display_name or current_user.username }}
             </a>
         {% else %}
-            <a href="/login" class="{% if request.url.path == '/login' %}active-nav{% endif %}">Login</a>
+            <a href="/login" class="{% if request.url.path == '/login' %}active-nav{% endif %}">تسجيل الدخول</a>
         {% endif %}
     </div>
 </header>
@@ -88,10 +95,6 @@
 <script>
 function toggleMenu() {
     document.getElementById("mobileMenu").classList.toggle("hidden");
-}
-
-function goHome() {
-    window.location.href = "/";
 }
 
 function setupNavIndicator() {
@@ -133,6 +136,10 @@ function setupNavIndicator() {
     window.addEventListener("resize", () => {
         const currentActive = nav.querySelector(".nav-link.active-nav");
         moveIndicator(currentActive);
+
+        if (window.innerWidth > 768) {
+            document.getElementById("mobileMenu").classList.add("hidden");
+        }
     });
 }
 

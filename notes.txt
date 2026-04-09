@@ -5,3 +5,13 @@
 - mobile style anpassen
 - Arcadiahub to AurixCube everywhere
 - Login system zabet.
+
+
+
+--- connectio to mobile when playing in draw not working properly
+--- Join while the session is active. 
+--- When drawing from phone it only shows points
+--- even from a pc sometimes drawing works and someimes not. 
+
+
+--- bluff, we want to see who submitted which answer.

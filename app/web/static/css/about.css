@@ -16,12 +16,15 @@
     filter: drop-shadow(0 0 10px rgba(255, 200, 80, 0.35));
 }
 
-.about-title {
-    margin: 0;
-    font-size: 34px;
-    font-weight: 800;
-    color: var(--brand-gold);
-    text-shadow: 0 0 10px rgba(255, 200, 80, 0.25);
+.about-title,
+.about-section-title {
+    font-family: var(--font-display);
+    color: var(--brand-gold-strong);
+}
+
+.about-section-title {
+    border-right: 3px solid rgba(214, 176, 106, 0.55);
+    padding-right: 12px;
 }
 
 .about-subtitle {
@@ -35,31 +38,12 @@
     margin-bottom: 28px;
 }
 
-.about-section-title {
-    margin: 0 0 14px;
-    font-size: 24px;
-    color: var(--brand-gold);
-    border-right: 3px solid rgba(255, 200, 80, 0.7);
-    padding-right: 12px;
-}
 
 .about-text {
-    margin: 0 0 14px;
-    color: #ddd;
-    line-height: 2;
-    font-size: 16px;
+    color: #e2d5bd;
 }
 
-.about-game-card {
-    display: flex;
-    align-items: flex-start;
-    gap: 18px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 200, 80, 0.12);
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 18px;
-}
+
 
 .about-game-number {
     min-width: 46px;
@@ -86,13 +70,6 @@
     color: #fff;
 }
 
-.about-points-box {
-    margin-top: 14px;
-    background: rgba(255, 200, 80, 0.06);
-    border: 1px solid rgba(255, 200, 80, 0.18);
-    border-radius: 12px;
-    padding: 14px 16px;
-}
 
 .about-point {
     color: #f0f0f0;
@@ -104,12 +81,12 @@
     margin-bottom: 0;
 }
 
+.about-game-card,
+.about-points-box,
 .about-feedback-box {
-    text-align: center;
-    background: rgba(255, 200, 80, 0.04);
-    border: 1px solid rgba(255, 200, 80, 0.14);
-    border-radius: 16px;
-    padding: 24px 20px;
+    background: linear-gradient(180deg, rgba(42, 34, 26, 0.88), rgba(22, 18, 14, 0.94));
+    border: 1px solid rgba(214, 176, 106, 0.22);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.22);
 }
 
 @media (max-width: 768px) {
