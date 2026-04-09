@@ -2,8 +2,13 @@
 
 .games-page-card {
     max-width: 1100px;
-    background:
+    background-color: #261e14;
+    background-image:
+        radial-gradient(circle at 10% 14%, rgba(255,255,255,0.05), transparent 16%),
+        radial-gradient(circle at 75% 16%, rgba(255,255,255,0.04), transparent 12%),
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.02), rgba(255,255,255,0.02) 1px, transparent 1px, transparent 10px),
         linear-gradient(180deg, rgba(30, 24, 18, 0.95), rgba(16, 12, 9, 0.98));
+    background-blend-mode: overlay, overlay, overlay, normal;
     border: 1px solid var(--border-strong);
     border-radius: 28px;
     padding: 34px 28px 38px;
@@ -111,8 +116,13 @@
 
 .game-option {
     position: relative;
-    background:
+    background-color: #2c2419;
+    background-image:
+        radial-gradient(circle at 14% 16%, rgba(255,255,255,0.05), transparent 16%),
+        radial-gradient(circle at 70% 20%, rgba(255,255,255,0.03), transparent 12%),
+        repeating-linear-gradient(45deg, rgba(255,255,255,0.015), rgba(255,255,255,0.015) 1px, transparent 1px, transparent 8px),
         linear-gradient(180deg, rgba(44, 36, 28, 0.94), rgba(22, 18, 14, 0.98));
+    background-blend-mode: overlay, overlay, overlay, normal;
     border: 1px solid rgba(214, 176, 106, 0.3);
     border-radius: 22px;
     padding: 24px 18px;
@@ -203,7 +213,7 @@
     position: absolute;
     top: 12px;
     left: -32px;
-    background: var(--game-accent);
+    background: #d4af37;
     color: #111;
     padding: 5px 38px;
     font-size: 10px;

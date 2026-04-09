@@ -1,6 +1,6 @@
-# ArcadiaHub
+# AurixCube
 
-ArcadiaHub is a modular browser-based game hub built with FastAPI and vanilla JavaScript.
+AurixCube is a modular browser-based game hub built with FastAPI and vanilla JavaScript.
 
 It is designed to support multiple lightweight social games through a clean, maintainable architecture.  
 The platform currently includes an Undercover-style game with room creation, joining, voting, and round management.
@@ -28,6 +28,6 @@ python run.py
 
 ## License
 
-ArcadiaHub Proprietary License v1.0
+AurixCube Proprietary License v1.0
 
 This project is proprietary software. Unauthorized use, copying, modification, or distribution is strictly prohibited.

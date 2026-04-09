@@ -6,7 +6,7 @@ import os
 class Settings(BaseModel):
     """Application settings."""
 
-    app_name: str = "ArcadiaHub"
+    app_name: str = "AurixCube"
     debug: bool = True
 
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
