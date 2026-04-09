@@ -343,7 +343,7 @@ CATEGORIES = {
         {"label": "الأهلي", "aliases": ["al ahly"]},
         {"label": "الزمالك", "aliases": ["zamalek"]},
         {"label": "الوداد", "aliases": ["wydad"]},
-        {"label": "الرجاء", "aliases": ["raja"]},,
+        {"label": "الرجاء", "aliases": ["raja"]},
         {"label": "اتلتيك بلباو", "aliases": ["athletic bilbao"]},
         {"label": "ريال سوسيداد", "aliases": ["real sociedad"]},
         {"label": "فالنسيا", "aliases": ["valencia"]},
@@ -557,7 +557,7 @@ CATEGORIES = {
         {"label": "شمس الأصيل", "aliases": ["shams al aseel", "دانا جبر ووائل زيدان"]},
         {"label": "لوبي الغرام", "aliases": ["lobby al gharam", "كوميديا رومانسية"]},
         {"label": "اليتيم", "aliases": ["al yateem", "دراما إنسانية"]},
-        {"label": "المليئية", "aliases": ["al maleeiya", "دراما ريفية"]}
+        {"label": "المليئية", "aliases": ["al maleeiya", "دراما ريفية"]},
         {"label": "باب الحارة", "aliases": ["bab al hara"]},
         {"label": "مرايا", "aliases": ["maraya"]},
         {"label": "بقعة ضوء", "aliases": ["buqat dawt"]},
