@@ -4,11 +4,13 @@
 
 {% block content %}
 <div class="{{ theme_class }}">
+    <div id="bluff-global-error" class="error-box hidden"></div>
     <div id="screen-bluff-lobby" class="card glow-border">
         <div class="game-title-box">
             <img src="/static/images/bluff-logo.png" class="game-title-logo">
             <span class="game-title-text">لعبة الخداع</span>
         </div>
+        <div id="bluff-lobby-error" class="error-box hidden"></div>
         <input type="text" id="bluffName" placeholder="اسمك المستعار....">
         <button class="btn btn-primary" onclick="showBluffSetup()">إنشاء غرفة جديدة</button>
         <div style="display: flex; margin:10px; color:#666; justify-content: center;">أو انضمام للغرفة</div>
@@ -23,6 +25,7 @@
 
     <div id="screen-bluff-setup" class="card hidden">
         <h2 style="color:var(--primary)">إعدادات اللعبة</h2>
+        <div id="bluff-setup-error" class="error-box hidden"></div>
 
         <label>عدد اللاعبين:</label>
         <div id="bluffPlayerCountGrid" class="category-grid"></div>
@@ -41,6 +44,7 @@
     </div>
 
     <div id="screen-bluff-wait" class="card hidden">
+        <div id="bluff-wait-error" class="error-box hidden"></div>
         <h3>كود الغرفة: <span id="bluffDisplayCode" style="color:var(--primary)"></span></h3>
 
         <div class="table-wrapper">
@@ -68,6 +72,7 @@
     </div>
 
     <div id="screen-bluff-category-pick" class="card hidden">
+            <div id="bluff-category-pick-error" class="error-box hidden"></div>
             <div id="bluffRoundInfoCategoryPick" class="round-meta"></div>
             <div id="bluffCategoryChooserInfo" class="phase-info"></div>
 
@@ -106,6 +111,7 @@
         </div>
 
         <div id="screen-bluff-submission" class="card hidden">
+            <div id="bluff-submission-error" class="error-box hidden"></div>
             <div id="bluffRoundInfoSubmission" class="round-meta"></div>
             <div class="phase-meta-line">التصنيف: <span id="bluffSubmissionCategoryLabel"></span></div>
 
@@ -150,6 +156,7 @@
         </div>
 
         <div id="screen-bluff-answer-pick" class="card hidden">
+            <div id="bluff-answer-pick-error" class="error-box hidden"></div>
             <div id="bluffRoundInfoAnswerPick" class="round-meta"></div>
             <div class="phase-meta-line">التصنيف: <span id="bluffAnswerPickCategoryLabel"></span></div>
 
@@ -194,6 +201,7 @@
         </div>
 
         <div id="screen-bluff-result" class="card hidden bluff-result-card">
+        <div id="bluff-result-error" class="error-box hidden"></div>
         <h2 style="color:var(--primary); text-align:center;">انتهت الجولة</h2>
 
         
@@ -236,6 +244,7 @@
     </div>
 
     <div id="screen-bluff-game-over" class="card hidden">
+        <div id="bluff-game-over-error" class="error-box hidden"></div>
         <h2 style="color:var(--primary)">انتهت اللعبة!</h2>
         <div id="bluffFinalMsg" style="font-size:20px; margin:20px; font-weight:bold;"></div>
 

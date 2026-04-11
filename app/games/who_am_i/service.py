@@ -324,8 +324,6 @@ class WhoAmIService:
             if not room.active_turn_order:
                 room.ended = True
                 room.current_turn_player_id = None
-            else:
-                self._advance_turn(room, solved_player_id=player_id)
         else:
             self._advance_turn(room)
 
@@ -386,9 +384,21 @@ class WhoAmIService:
         Each player gets exactly one turn per round.
         """
 
-        # Remove solved player BEFORE computing next turn
+        # Handle solved player removal
         if solved_player_id and solved_player_id in room.active_turn_order:
+            solved_index = room.active_turn_order.index(solved_player_id)
             room.active_turn_order.remove(solved_player_id)
+            if solved_player_id == room.current_turn_player_id:
+                # The current player solved, advance past their position
+                if room.active_turn_order:
+                    next_index = solved_index
+                    if next_index >= len(room.active_turn_order):
+                        next_index = 0
+                        room.turn_number += 1
+                    room.current_turn_player_id = room.active_turn_order[next_index]
+                else:
+                    room.current_turn_player_id = None
+                return
 
         if not room.active_turn_order:
             room.current_turn_player_id = None

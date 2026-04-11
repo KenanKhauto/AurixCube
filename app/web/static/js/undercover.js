@@ -39,7 +39,17 @@ const categoryLabels = {
     superheroes: "مارفل و دي سي",
     clothing_brands: "ماركات  ملابس",
 };
+function showUndercoverError(message) {
+    const errorDiv = document.getElementById('undercover-global-error');
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 
+function hideUndercoverError() {
+    const errorDiv = document.getElementById('undercover-global-error');
+    errorDiv.classList.add('hidden');
+}
 /**
  * Initialize page.
  */
@@ -100,7 +110,7 @@ function toggleCategory(categoryKey) {
         selectedCategories = selectedCategories.filter((c) => c !== categoryKey);
     } else {
         if (selectedCategories.length >= MAX_CATEGORIES) {
-            alert(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
+            showUndercoverError(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
             return;
         }
         selectedCategories.push(categoryKey);
@@ -218,7 +228,7 @@ function showSelection() {
     const name = document.getElementById("pName").value.trim();
 
     if (!name) {
-        alert("الرجاء إدخال اسمك أولاً!");
+        showUndercoverError("الرجاء إدخال اسمك أولاً!");
         return;
     }
 
@@ -251,22 +261,22 @@ async function createRoom() {
     const undercoverCount = selectedUndercoverCount;
 
     if (!hostName) {
-        alert("الرجاء إدخال الاسم أولاً!");
+        showUndercoverError("الرجاء إدخال الاسم أولاً!");
         return;
     }
 
     if (!playerCount) {
-        alert("اختر عدد اللاعبين أولاً!");
+        showUndercoverError("اختر عدد اللاعبين أولاً!");
         return;
     }
 
     if (!undercoverCount) {
-        alert("اختر عدد المندسين أولاً!");
+        showUndercoverError("اختر عدد المندسين أولاً!");
         return;
     }
 
     if (selectedCategories.length === 0) {
-        alert("اختر تصنيفاً واحداً على الأقل!");
+        showUndercoverError("اختر تصنيفاً واحداً على الأقل!");
         return;
     }
     const response = await fetch("/api/undercover/rooms", {
@@ -283,13 +293,13 @@ async function createRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        showUndercoverError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
         return;
     }
 
     const hostPlayer = data.players.find((player) => player.id === data.host_id);
     if (!hostPlayer) {
-        alert("تعذر تحديد صاحب الغرفة.");
+        showUndercoverError("تعذر تحديد صاحب الغرفة.");
         return;
     }
 
@@ -318,7 +328,7 @@ async function joinRoom() {
     const roomCode = document.getElementById("roomInput").value.trim().toUpperCase();
 
     if (!name || !roomCode) {
-        alert("اكمل البيانات!");
+        showUndercoverError("اكمل البيانات!");
         return;
     }
 
@@ -331,7 +341,7 @@ async function joinRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الانضمام إلى الغرفة.");
+        showUndercoverError(data.detail || "تعذر الانضمام إلى الغرفة.");
         return;
     }
 
@@ -367,7 +377,7 @@ async function startMondasGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر بدء اللعبة.");
+        showUndercoverError(data.detail || "تعذر بدء اللعبة.");
         return;
     }
 
@@ -392,7 +402,7 @@ async function showRevealScreen() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر جلب الكلمة.");
+        showUndercoverError(data.detail || "تعذر جلب الكلمة.");
         return;
     }
 
@@ -517,7 +527,7 @@ function announceRoundEventIfNeeded(data) {
     lastAnnouncementKey = eventKey;
 
     if (data.last_vote_result === "tie") {
-        alert("تعادل في التصويت. لم يُقصَ أحد. تابعوا النقاش وابدأوا جولة جديدة.");
+        showUndercoverError("تعادل في التصويت. لم يُقصَ أحد. تابعوا النقاش وابدأوا جولة جديدة.");
         return;
     }
 
@@ -526,9 +536,9 @@ function announceRoundEventIfNeeded(data) {
         if (!eliminated) return;
 
         if (data.eliminated_player_is_undercover) {
-            alert(`تم إقصاء ${eliminated.name} وكان مندساً.`);
+            showUndercoverError(`تم إقصاء ${eliminated.name} وكان مندساً.`);
         } else {
-            alert(`تم إقصاء ${eliminated.name} وكان بريئاً.`);
+            showUndercoverError(`تم إقصاء ${eliminated.name} وكان بريئاً.`);
         }
     }
 }
@@ -701,7 +711,7 @@ function toggleVote(targetPlayerId, maxVotes) {
         selectedVotes = selectedVotes.filter((id) => id !== targetPlayerId);
     } else {
         if (selectedVotes.length >= maxVotes) {
-            alert(`يمكنك التصويت على ${maxVotes} لاعب فقط`);
+            showUndercoverError(`يمكنك التصويت على ${maxVotes} لاعب فقط`);
             return;
         }
         selectedVotes.push(targetPlayerId);
@@ -728,7 +738,7 @@ async function submitVotes() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر إرسال التصويت.");
+        showUndercoverError(data.detail || "تعذر إرسال التصويت.");
         return;
     }
 
@@ -765,7 +775,7 @@ async function restartGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر إعادة اللعبة.");
+        showUndercoverError(data.detail || "تعذر إعادة اللعبة.");
         return;
     }
 
@@ -798,7 +808,7 @@ async function leaveCurrentRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الخروج من الغرفة.");
+        showUndercoverError(data.detail || "تعذر الخروج من الغرفة.");
         return;
     }
 
@@ -826,7 +836,7 @@ async function deleteCurrentRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر حذف الغرفة.");
+        showUndercoverError(data.detail || "تعذر حذف الغرفة.");
         return;
     }
 

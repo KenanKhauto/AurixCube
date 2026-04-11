@@ -34,8 +34,19 @@ const bluffRoundTimerOptions = [
 let selectedBluffCharacter = localStorage.getItem("bluff_character_id") || "char1";
 const bluffCharacterOptions = Array.from({ length: 12 }, (_, i) => `char${i + 1}`);
 
+function showBluffError(message) {
+    const errorDiv = document.getElementById('bluff-global-error');
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function hideBluffError() {
+    const errorDiv = document.getElementById('bluff-global-error');
+    errorDiv.classList.add('hidden');
+}
+
 const bluffPlayerCountOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
-const bluffRoundsOptions = [2, 5, 10, 15, 20, 25, 30];
 
 const bluffCategoryLabels = {
     capitals: "دول",
@@ -224,6 +235,7 @@ function renderBluffPlayerCountButtons() {
                 selectedBluffRounds = count;
             }
             updateBluffPlayerCountButtonsState();
+            renderBluffRoundsButtons();
             updateBluffRoundsButtonsState();
         };
         container.appendChild(button);
@@ -246,7 +258,16 @@ function renderBluffRoundsButtons() {
 
     container.innerHTML = "";
 
-    bluffRoundsOptions.forEach((rounds) => {
+    let options = [];
+    if (selectedBluffPlayerCount) {
+        for (let i = selectedBluffPlayerCount; i <= 30; i += selectedBluffPlayerCount) {
+            options.push(i);
+        }
+    } else {
+        options = [2, 5, 10, 15, 20, 25, 30];
+    }
+
+    options.forEach((rounds) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "category-btn";
@@ -258,6 +279,10 @@ function renderBluffRoundsButtons() {
         };
         container.appendChild(button);
     });
+
+    if (selectedBluffRounds && !options.includes(selectedBluffRounds)) {
+        selectedBluffRounds = options[0] || null;
+    }
 
     updateBluffRoundsButtonsState();
 }
@@ -286,7 +311,7 @@ function toggleBluffCategory(categoryKey) {
         selectedBluffCategories = selectedBluffCategories.filter((c) => c !== categoryKey);
     } else {
         if (selectedBluffCategories.length >= MAX_CATEGORIES) {
-            alert(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
+            showBluffError(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
             return;
         }
         selectedBluffCategories.push(categoryKey);
@@ -323,7 +348,7 @@ function showBluffSetup() {
     const name = document.getElementById("bluffName").value.trim();
 
     if (!name) {
-        alert("الرجاء إدخال اسمك أولاً!");
+        showBluffError("الرجاء إدخال اسمك أولاً!");
         return;
     }
 
@@ -345,27 +370,27 @@ async function createBluffRoom() {
     const totalRounds = selectedBluffRounds;
 
     if (!hostName) {
-        alert("الرجاء إدخال الاسم أولاً!");
+        showBluffError("الرجاء إدخال الاسم أولاً!");
         return;
     }
 
     if (!playerCount) {
-        alert("اختر عدد اللاعبين أولاً!");
+        showBluffError("اختر عدد اللاعبين أولاً!");
         return;
     }
 
     if (!totalRounds) {
-        alert("اختر عدد الجولات أولاً!");
+        showBluffError("اختر عدد الجولات أولاً!");
         return;
     }
 
     if (totalRounds < playerCount) {
-        alert("عدد الجولات يجب أن يكون على الأقل بعدد اللاعبين.");
+        showBluffError("عدد الجولات يجب أن يكون على الأقل بعدد اللاعبين.");
         return;
     }
 
     if (selectedBluffCategories.length === 0) {
-        alert("اختر تصنيفاً واحداً على الأقل!");
+        showBluffError("اختر تصنيفاً واحداً على الأقل!");
         return;
     }
 
@@ -385,7 +410,7 @@ async function createBluffRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        showBluffError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
         return;
     }
 
@@ -400,6 +425,7 @@ async function createBluffRoom() {
     localStorage.setItem("bluff_player_id", currentBluffPlayerId);
     localStorage.setItem("bluff_player_name", currentBluffPlayerName);
 
+    hideBluffError();
     renderBluffWaitingRoom(data);
 }
 
@@ -408,7 +434,7 @@ async function joinBluffRoom() {
     const roomCode = document.getElementById("bluffRoomInput").value.trim().toUpperCase();
 
     if (!name || !roomCode) {
-        alert("اكمل البيانات!");
+        showBluffError("اكمل البيانات!");
         return;
     }
 
@@ -424,7 +450,7 @@ async function joinBluffRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الانضمام إلى الغرفة.");
+        showBluffError(data.detail || "تعذر الانضمام إلى الغرفة.");
         return;
     }
 
@@ -443,6 +469,7 @@ async function joinBluffRoom() {
     localStorage.setItem("bluff_player_id", currentBluffPlayerId);
     localStorage.setItem("bluff_player_name", currentBluffPlayerName);
 
+    hideBluffError();
     renderBluffState(data);
 }
 
@@ -454,7 +481,7 @@ async function startBluffGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر بدء اللعبة.");
+        showBluffError(data.detail || "تعذر بدء اللعبة.");
         return;
     }
 
@@ -478,7 +505,7 @@ async function selectBluffRoundCategory(category) {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر اختيار التصنيف.");
+        showBluffError(data.detail || "تعذر اختيار التصنيف.");
         return;
     }
 
@@ -494,7 +521,7 @@ async function submitBluffAnswer() {
     const answerText = input.value.trim();
 
     if (!answerText) {
-        alert("اكتب إجابة أولاً.");
+        showBluffError("اكتب إجابة أولاً.");
         return;
     }
 
@@ -510,7 +537,7 @@ async function submitBluffAnswer() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر إرسال الإجابة.");
+        showBluffError(data.detail || "تعذر إرسال الإجابة.");
         return;
     }
 
@@ -535,7 +562,7 @@ async function submitBluffPick(optionId) {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر إرسال الاختيار.");
+        showBluffError(data.detail || "تعذر إرسال الاختيار.");
         return;
     }
 
@@ -558,7 +585,7 @@ async function advanceBluffRound() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الانتقال للجولة التالية.");
+        showBluffError(data.detail || "تعذر الانتقال للجولة التالية.");
         return;
     }
 
@@ -576,12 +603,12 @@ async function restartBluffGame() {
         : currentBluffRoomData?.categories || [];
 
     if (!totalRounds) {
-        alert("اختر عدد الجولات أولاً!");
+        showBluffError("اختر عدد الجولات أولاً!");
         return;
     }
 
     if (categories.length === 0) {
-        alert("اختر تصنيفاً واحداً على الأقل!");
+        showBluffError("اختر تصنيفاً واحداً على الأقل!");
         return;
     }
 
@@ -598,7 +625,7 @@ async function restartBluffGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر إعادة اللعبة.");
+        showBluffError(data.detail || "تعذر إعادة اللعبة.");
         return;
     }
 
@@ -625,7 +652,7 @@ async function leaveBluffRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الخروج من الغرفة.");
+        showBluffError(data.detail || "تعذر الخروج من الغرفة.");
         return;
     }
 
@@ -650,7 +677,7 @@ async function deleteBluffRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر حذف الغرفة.");
+        showBluffError(data.detail || "تعذر حذف الغرفة.");
         return;
     }
 

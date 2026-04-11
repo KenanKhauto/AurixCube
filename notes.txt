@@ -18,3 +18,5 @@ so that if we choose 5 players then 3 can play too or 4.
 
 --- host should be able to delete people from the session at any given point.
 
+--- for the who am I game when someone guesses right it shoult contiue the order of the players 
+and not start randomly again or from the start. 

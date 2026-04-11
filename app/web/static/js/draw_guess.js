@@ -21,7 +21,6 @@ let drawLastY = 0;
 
 const MAX_DRAW_CATEGORIES = 12;
 const drawPlayerCountOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
-const drawRoundsOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
 const drawTimerOptions = [
     { value: 30, label: "30 ثانية" },
     { value: 60, label: "60 ثانية" },
@@ -32,6 +31,18 @@ const drawLanguageOptions = [
     { value: "ar", label: "العربية" },
 ];
 const drawCharacterOptions = Array.from({ length: 12 }, (_, i) => `char${i + 1}`);
+
+function showDrawError(message) {
+    const errorDiv = document.getElementById('draw-global-error');
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function hideDrawError() {
+    const errorDiv = document.getElementById('draw-global-error');
+    errorDiv.classList.add('hidden');
+}
 
 const drawCategoryLabels = {
     animals: "حيوانات",
@@ -359,7 +370,7 @@ function connectDrawWS(roomCode) {
         drawWS = new WebSocket(wsUrl);
     } catch (error) {
         console.error("Failed to create WebSocket:", error);
-        alert("خطأ في الاتصال. حاول مرة أخرى.");
+        showDrawError("خطأ في الاتصال. حاول مرة أخرى.");
         return;
     }
 
@@ -482,6 +493,7 @@ function renderDrawPlayerCountButtons() {
                 selectedDrawRounds = count;
             }
             updateDrawPlayerCountButtonsState();
+            renderDrawRoundsButtons();
             updateDrawRoundsButtonsState();
         };
         container.appendChild(button);
@@ -502,7 +514,16 @@ function renderDrawRoundsButtons() {
 
     container.innerHTML = "";
 
-    drawRoundsOptions.forEach((rounds) => {
+    let options = [];
+    if (selectedDrawPlayerCount) {
+        for (let i = selectedDrawPlayerCount; i <= 10; i += selectedDrawPlayerCount) {
+            options.push(i);
+        }
+    } else {
+        options = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    }
+
+    options.forEach((rounds) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "category-btn";
@@ -514,6 +535,10 @@ function renderDrawRoundsButtons() {
         };
         container.appendChild(button);
     });
+
+    if (selectedDrawRounds && !options.includes(selectedDrawRounds)) {
+        selectedDrawRounds = options[0] || null;
+    }
 
     updateDrawRoundsButtonsState();
 }
@@ -632,7 +657,7 @@ function toggleDrawCategory(categoryKey) {
         selectedDrawCategories = selectedDrawCategories.filter((c) => c !== categoryKey);
     } else {
         if (selectedDrawCategories.length >= MAX_DRAW_CATEGORIES) {
-            alert(`يمكنك اختيار ${MAX_DRAW_CATEGORIES} تصنيفات كحد أقصى`);
+            showDrawError(`يمكنك اختيار ${MAX_DRAW_CATEGORIES} تصنيفات كحد أقصى`);
             return;
         }
         selectedDrawCategories.push(categoryKey);
@@ -656,7 +681,7 @@ function updateDrawCategoryButtonsState() {
 function showDrawSetup() {
     const name = document.getElementById("drawName").value.trim();
     if (!name) {
-        alert("الرجاء إدخال اسمك أولاً!");
+        showDrawError("الرجاء إدخال اسمك أولاً!");
         return;
     }
 
@@ -676,23 +701,23 @@ async function createDrawRoom() {
     const hostName = document.getElementById("drawName").value.trim();
 
     if (!hostName) {
-        alert("الرجاء إدخال الاسم أولاً!");
+        showDrawError("الرجاء إدخال الاسم أولاً!");
         return;
     }
     if (!selectedDrawPlayerCount) {
-        alert("اختر عدد اللاعبين أولاً!");
+        showDrawError("اختر عدد اللاعبين أولاً!");
         return;
     }
     if (!selectedDrawRounds) {
-        alert("اختر عدد الجولات أولاً!");
+        showDrawError("اختر عدد الجولات أولاً!");
         return;
     }
     if (selectedDrawRounds < selectedDrawPlayerCount) {
-        alert("عدد الجولات يجب أن يكون على الأقل بعدد اللاعبين.");
+        showDrawError("عدد الجولات يجب أن يكون على الأقل بعدد اللاعبين.");
         return;
     }
     if (selectedDrawCategories.length === 0) {
-        alert("اختر تصنيفاً واحداً على الأقل!");
+        showDrawError("اختر تصنيفاً واحداً على الأقل!");
         return;
     }
 
@@ -713,7 +738,7 @@ async function createDrawRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        showDrawError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
         return;
     }
 
@@ -737,7 +762,7 @@ async function joinDrawRoom() {
     const roomCode = document.getElementById("drawRoomInput").value.trim().toUpperCase();
 
     if (!name || !roomCode) {
-        alert("اكمل البيانات!");
+        showDrawError("اكمل البيانات!");
         return;
     }
 
@@ -753,7 +778,7 @@ async function joinDrawRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الانضمام إلى الغرفة.");
+        showDrawError(data.detail || "تعذر الانضمام إلى الغرفة.");
         return;
     }
 
@@ -784,7 +809,7 @@ async function startDrawGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر بدء اللعبة.");
+        showDrawError(data.detail || "تعذر بدء اللعبة.");
         return;
     }
 
@@ -806,7 +831,7 @@ async function selectDrawWord(chosenWordEn) {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر اختيار الكلمة.");
+        showDrawError(data.detail || "تعذر اختيار الكلمة.");
         return;
     }
 
@@ -850,7 +875,7 @@ async function advanceDrawRound() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الانتقال للجولة التالية.");
+        showDrawError(data.detail || "تعذر الانتقال للجولة التالية.");
         return;
     }
 
@@ -883,7 +908,7 @@ async function restartDrawGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر إعادة اللعبة.");
+        showDrawError(data.detail || "تعذر إعادة اللعبة.");
         return;
     }
 
@@ -905,7 +930,7 @@ async function leaveDrawRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الخروج من الغرفة.");
+        showDrawError(data.detail || "تعذر الخروج من الغرفة.");
         return;
     }
 
@@ -926,7 +951,7 @@ async function deleteDrawRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر حذف الغرفة.");
+        showDrawError(data.detail || "تعذر حذف الغرفة.");
         return;
     }
 

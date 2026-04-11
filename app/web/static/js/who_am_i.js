@@ -32,6 +32,18 @@ const categoryLabels = {
     clothing_brands: "ماركات ملابس",
 };
 
+function showWhoAmIError(message) {
+    const errorDiv = document.getElementById('whoami-global-error');
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function hideWhoAmIError() {
+    const errorDiv = document.getElementById('whoami-global-error');
+    errorDiv.classList.add('hidden');
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
     renderPlayerCountButtons();
     await loadCategories();
@@ -183,7 +195,7 @@ function toggleCategory(categoryKey) {
         selectedCategories = selectedCategories.filter((c) => c !== categoryKey);
     } else {
         if (selectedCategories.length >= MAX_CATEGORIES) {
-            alert(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
+            showWhoAmIError(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
             return;
         }
 
@@ -227,7 +239,7 @@ function showSetup() {
     const name = document.getElementById("pName").value.trim();
 
     if (!name) {
-        alert("الرجاء إدخال اسمك أولاً!");
+        showWhoAmIError("الرجاء إدخال اسمك أولاً!");
         return;
     }
 
@@ -248,11 +260,11 @@ async function createRoom() {
     const playerCount = selectedPlayerCount;
 
     if (selectedCategories.length === 0) {
-    alert("اختر تصنيفاً واحداً على الأقل!");
+    showWhoAmIError("اختر تصنيفاً واحداً على الأقل!");
     return;
     }
     if (!selectedPlayerCount) {
-        alert("اختر عدد اللاعبين أولاً!");
+        showWhoAmIError("اختر عدد اللاعبين أولاً!");
         return;
     }
 
@@ -271,7 +283,7 @@ async function createRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        showWhoAmIError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
         return;
     }
 
@@ -287,8 +299,7 @@ async function createRoom() {
     localStorage.setItem("whoami_room_code", currentRoomCode);
     localStorage.setItem("whoami_player_id", currentPlayerId);
     localStorage.setItem("whoami_player_name", currentPlayerName);
-
-    renderWaitingRoom(data);
+    hideWhoAmIError();    renderWaitingRoom(data);
 }
 
 async function joinRoom() {
@@ -296,7 +307,7 @@ async function joinRoom() {
     const roomCode = document.getElementById("roomInput").value.trim().toUpperCase();
 
     if (!name || !roomCode) {
-        alert("اكمل البيانات!");
+        showWhoAmIError("اكمل البيانات!");
         return;
     }
 
@@ -312,7 +323,7 @@ async function joinRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الانضمام إلى الغرفة.");
+        showWhoAmIError(data.detail || "تعذر الانضمام إلى الغرفة.");
         return;
     }
 
@@ -332,8 +343,7 @@ async function joinRoom() {
     localStorage.setItem("whoami_room_code", currentRoomCode);
     localStorage.setItem("whoami_player_id", currentPlayerId);
     localStorage.setItem("whoami_player_name", currentPlayerName);
-
-    renderState(data);
+    hideWhoAmIError();    renderState(data);
 }
 
 async function startGame() {
@@ -344,7 +354,7 @@ async function startGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر بدء اللعبة.");
+        showWhoAmIError(data.detail || "تعذر بدء اللعبة.");
         return;
     }
 
@@ -367,7 +377,7 @@ async function advanceRevealPhase() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الانتقال للاعب التالي.");
+        showWhoAmIError(data.detail || "تعذر الانتقال للاعب التالي.");
         return;
     }
 
@@ -386,7 +396,7 @@ async function submitGuess() {
     const guessText = guessInput.value.trim();
 
     if (!guessText) {
-        alert("أدخل تخميناً أولاً.");
+        showWhoAmIError("أدخل تخميناً أولاً.");
         return;
     }
 
@@ -402,7 +412,7 @@ async function submitGuess() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر إرسال التخمين.");
+        showWhoAmIError(data.detail || "تعذر إرسال التخمين.");
         return;
     }
 
@@ -442,7 +452,7 @@ async function fetchMySolvedIdentity() {
 
 async function restartGame() {
     if (selectedCategories.length === 0) {
-    alert("اختر تصنيفاً واحداً على الأقل!");
+    showWhoAmIError("اختر تصنيفاً واحداً على الأقل!");
     return;
     }
 
@@ -455,7 +465,7 @@ async function restartGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر إعادة اللعبة.");
+        showWhoAmIError(data.detail || "تعذر إعادة اللعبة.");
         return;
     }
 
@@ -479,7 +489,7 @@ async function leaveCurrentRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر الخروج من الغرفة.");
+        showWhoAmIError(data.detail || "تعذر الخروج من الغرفة.");
         return;
     }
 
@@ -500,7 +510,7 @@ async function deleteCurrentRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        alert(data.detail || "تعذر حذف الغرفة.");
+        showWhoAmIError(data.detail || "تعذر حذف الغرفة.");
         return;
     }
 
