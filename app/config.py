@@ -8,6 +8,7 @@ class Settings(BaseModel):
 
     app_name: str = "AurixCube"
     debug: bool = True
+    session_secret_key: str = os.getenv("SESSION_SECRET_KEY", "change-this-in-production")
 
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     use_redis_for_rooms: bool = os.getenv("USE_REDIS_FOR_ROOMS", "false").lower() == "true"

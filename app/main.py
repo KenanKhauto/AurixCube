@@ -19,7 +19,7 @@ app = FastAPI(title=settings.app_name, debug=settings.debug)
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key="change-this-in-production",
+    secret_key=settings.session_secret_key,
 )
 
 app.mount("/static", StaticFiles(directory="app/web/static"), name="static")

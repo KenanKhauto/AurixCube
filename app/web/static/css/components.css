@@ -11,7 +11,7 @@
     background-blend-mode: overlay, overlay, overlay, overlay, normal;
     padding: 28px;
     border-radius: 22px;
-    max-width: 480px;
+    width: min(100%, 1040px);
     margin: 20px auto;
     border: 1px solid var(--border-strong);
     box-shadow:
@@ -208,6 +208,260 @@ textarea:focus {
     color: var(--text);
     word-break: break-word;
     text-align: left;
+}
+
+.profile-social-box {
+    background:
+        linear-gradient(180deg, rgba(18, 16, 13, 0.98), rgba(10, 9, 7, 0.98));
+    border: 1px solid rgba(214, 176, 106, 0.18);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        0 12px 28px rgba(0,0,0,0.22);
+}
+
+.profile-edit-box {
+    background:
+        linear-gradient(180deg, rgba(18, 16, 13, 0.98), rgba(10, 9, 7, 0.98));
+}
+
+.profile-summary-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(214, 176, 106, 0.32);
+    box-shadow: 0 0 12px rgba(214, 176, 106, 0.14);
+}
+
+.profile-edit-form {
+    margin-top: 8px;
+}
+
+.profile-edit-grid {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 24px;
+    margin-bottom: 20px;
+    align-items: start;
+}
+
+.profile-image-editor {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(214, 176, 106, 0.18);
+    background: rgba(255,255,255,0.02);
+}
+
+.profile-edit-preview {
+    width: 132px;
+    height: 132px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(214, 176, 106, 0.38);
+    box-shadow: 0 0 18px rgba(214, 176, 106, 0.14);
+    background: rgba(255,255,255,0.04);
+}
+
+.profile-upload-label {
+    width: 100%;
+    text-align: center;
+    color: var(--brand-gold-strong);
+    font-weight: 700;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px dashed rgba(214, 176, 106, 0.28);
+    background: rgba(255,255,255,0.02);
+}
+
+.profile-upload-hint {
+    margin: 0;
+    color: #9f9b92;
+    font-size: 12px;
+}
+
+.profile-image-editor input[type="file"] {
+    margin: 0;
+    padding: 10px;
+    text-align: right;
+}
+
+.profile-edit-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.profile-password-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.profile-social-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.profile-social-header-requests {
+    margin-top: 28px;
+}
+
+.profile-section-title {
+    margin: 0;
+    color: var(--brand-gold-strong);
+    font-size: 21px;
+    font-weight: 800;
+}
+
+.profile-section-subtitle {
+    margin: 6px 0 0;
+    color: #9f9b92;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+.profile-friends-table-wrapper {
+    margin-top: 0;
+}
+
+.profile-friends-table td {
+    vertical-align: middle;
+}
+
+.profile-friend-cell {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.profile-friend-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(214, 176, 106, 0.32);
+    box-shadow: 0 0 12px rgba(214, 176, 106, 0.12);
+    background: rgba(255,255,255,0.04);
+}
+
+.profile-friend-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.profile-friend-name {
+    color: #fff;
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.profile-friend-username {
+    color: #a39d92;
+    font-size: 12px;
+    direction: ltr;
+}
+
+.profile-action-group {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.profile-action-btn {
+    width: auto;
+    min-width: 84px;
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.profile-muted-dash {
+    color: #6f695f;
+}
+
+.profile-empty-state {
+    text-align: center;
+    padding: 18px 14px;
+    border: 1px dashed rgba(214, 176, 106, 0.18);
+    border-radius: 14px;
+    color: #9f9b92;
+    background: rgba(255,255,255,0.02);
+}
+
+.profile-pager {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.profile-page-arrow {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    border: 1px solid rgba(214, 176, 106, 0.24);
+    background: rgba(42, 30, 16, 0.9);
+    color: var(--brand-gold-strong);
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.profile-page-arrow:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: rgba(240, 209, 138, 0.65);
+    box-shadow: 0 0 14px rgba(214, 176, 106, 0.14);
+}
+
+.profile-page-arrow:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.profile-page-indicator {
+    color: #c4b28b;
+    font-size: 13px;
+    min-width: 54px;
+    text-align: center;
+}
+
+.profile-add-friend-form {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(214, 176, 106, 0.14);
+}
+
+.profile-form-label {
+    display: block;
+    color: var(--brand-gold-strong);
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.profile-add-friend-row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+}
+
+.profile-add-friend-row input {
+    margin: 0;
+    flex: 1 1 auto;
+}
+
+.profile-add-friend-button {
+    width: auto;
+    min-width: 160px;
+    margin: 0;
+    flex-shrink: 0;
 }
 
 /* ================= GAME UI ================= */
@@ -802,6 +1056,109 @@ textarea:focus {
     margin: 0;
 }
 
+.app-panel {
+    width: min(100%, 760px);
+}
+
+.app-panel-content {
+    text-align: initial;
+}
+
+.app-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.app-panel-close {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: 1px solid rgba(240, 209, 138, 0.22);
+    background: rgba(255,255,255,0.03);
+    color: var(--brand-gold-strong);
+    cursor: pointer;
+}
+
+.app-panel-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.app-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.app-list-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(214, 176, 106, 0.16);
+    background: rgba(255,255,255,0.03);
+}
+
+.app-list-card-main {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.app-list-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(214, 176, 106, 0.3);
+}
+
+.app-list-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.app-list-title {
+    color: #fff;
+    font-weight: 700;
+}
+
+.app-list-subtitle {
+    color: #d4c8ae;
+    font-size: 14px;
+}
+
+.app-list-footnote {
+    color: #9f9b92;
+    font-size: 12px;
+}
+
+.app-list-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.app-list-action-btn {
+    width: auto;
+    min-width: 88px;
+    margin: 0;
+    padding: 8px 12px;
+}
+
+.app-list-empty {
+    text-align: center;
+    color: #aaa;
+    padding: 24px 12px;
+    border: 1px dashed rgba(214, 176, 106, 0.2);
+    border-radius: 16px;
+}
+
 /* ================= RESPONSIVE ================= */
 
 @media (max-width: 768px) {
@@ -814,6 +1171,31 @@ textarea:focus {
         text-align: right;
     }
 
+    .profile-social-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .profile-edit-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-password-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-add-friend-row {
+        flex-direction: column;
+    }
+
+    .profile-add-friend-button {
+        width: 100%;
+    }
+
+    .profile-action-group {
+        flex-direction: column;
+    }
+
     .app-modal-content {
         padding: 24px 18px 18px;
     }
@@ -824,5 +1206,14 @@ textarea:focus {
 
     .app-modal-action {
         width: 100%;
+    }
+
+    .app-list-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .app-list-actions {
+        flex-direction: column;
     }
 }

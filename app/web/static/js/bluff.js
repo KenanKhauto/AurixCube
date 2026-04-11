@@ -1518,3 +1518,50 @@ setInterval(() => {
         updateBluffLiveTimer(currentBluffRoomData);
     }
 }, 1000);
+
+function ensureBluffInviteButton() {
+    if (!window.appCurrentUser || !bluffIsHost || !currentBluffRoomCode) return;
+
+    const hostArea = document.getElementById("bluffHostArea");
+    if (!hostArea || hostArea.querySelector(".invite-friends-btn")) return;
+
+    const inviteButton = document.createElement("button");
+    inviteButton.type = "button";
+    inviteButton.className = "btn invite-friends-btn";
+    inviteButton.textContent = "دعوة الأصدقاء";
+    inviteButton.onclick = () => openInviteFriendsModal("bluff", currentBluffRoomCode);
+    hostArea.insertBefore(inviteButton, hostArea.firstChild);
+}
+
+const originalRenderBluffWaitingRoom = renderBluffWaitingRoom;
+renderBluffWaitingRoom = function(data) {
+    originalRenderBluffWaitingRoom(data);
+    ensureBluffInviteButton();
+};
+
+async function maybeAutoJoinBluffInvite() {
+    if (!window.appCurrentUser || currentBluffRoomCode || currentBluffPlayerId) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const inviteRoom = params.get("invite_room");
+    const accepted = params.get("invite_accept");
+    if (!inviteRoom || accepted !== "1") return;
+
+    const preferredName = (window.appCurrentUser.display_name || window.appCurrentUser.username || "").trim();
+    if (preferredName) {
+        currentBluffPlayerName = preferredName;
+        localStorage.setItem("bluff_player_name", preferredName);
+        const nameInput = document.getElementById("bluffName");
+        if (nameInput) nameInput.value = preferredName;
+    }
+
+    const roomInput = document.getElementById("bluffRoomInput");
+    if (roomInput) roomInput.value = inviteRoom;
+
+    history.replaceState({}, "", location.pathname);
+    await joinBluffRoom();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    maybeAutoJoinBluffInvite();
+});

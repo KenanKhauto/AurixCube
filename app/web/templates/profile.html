@@ -5,22 +5,34 @@
 {% block content %}
 <div class="card glow-border">
     <h1 style="color:var(--primary); text-shadow: var(--glow);">الملف الشخصي</h1>
-    <p style="color:#aaa;">أنت الآن مسجل الدخول إلى AurixCube.</p>
+    <p style="color:#aaa;">يمكنك تعديل بيانات الحساب وصورة الملف من هنا.</p>
 
     <div class="profile-box">
         <div class="profile-row">
             <span class="profile-label">اسم المستخدم:</span>
-            <span class="profile-value">{{ current_user.username }}</span>
+            <span class="profile-value" id="profileCurrentUsername">{{ current_user.username }}</span>
         </div>
 
         <div class="profile-row">
             <span class="profile-label">الاسم الظاهر:</span>
-            <span class="profile-value">{{ current_user.display_name or "-" }}</span>
+            <span class="profile-value" id="profileCurrentDisplayName">{{ current_user.display_name or "-" }}</span>
+        </div>
+
+        <div class="profile-row">
+            <span class="profile-label">صورة الملف:</span>
+            <span class="profile-value">
+                <img
+                    id="profileSummaryAvatar"
+                    src="/static/images/{{ current_user.profile_image or 'profile_img_default.png' }}"
+                    class="profile-summary-avatar"
+                    alt="Profile Image"
+                >
+            </span>
         </div>
 
         <div class="profile-row">
             <span class="profile-label">البريد الإلكتروني:</span>
-            <span class="profile-value">{{ current_user.email or "-" }}</span>
+            <span class="profile-value" id="profileCurrentEmail">{{ current_user.email or "-" }}</span>
         </div>
 
         <div class="profile-row">
@@ -29,10 +41,411 @@
         </div>
     </div>
 
+    <div class="profile-box profile-edit-box" style="margin-top: 20px;">
+        <div class="profile-social-header">
+            <div>
+                <h3 class="profile-section-title">تعديل بيانات الحساب</h3>
+                <p class="profile-section-subtitle">يمكنك تعديل اسم المستخدم والاسم الظاهر والبريد الإلكتروني وكلمة المرور والصورة الشخصية.</p>
+            </div>
+        </div>
+
+        <form id="profile-edit-form" class="profile-edit-form" enctype="multipart/form-data">
+            <div class="profile-edit-grid">
+                <div class="profile-image-editor">
+                    <img
+                        id="profileEditPreview"
+                        src="/static/images/{{ current_user.profile_image or 'profile_img_default.png' }}"
+                        class="profile-edit-preview"
+                        alt="Profile Preview"
+                    >
+                    <label class="profile-upload-label" for="profile-image-input">اختر صورة جديدة</label>
+                    <input id="profile-image-input" type="file" name="profile_image" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
+                    <p class="profile-upload-hint">الحد الأقصى 5 ميغابايت</p>
+                </div>
+
+                <div class="profile-edit-fields">
+                    <label class="profile-form-label" for="profile-username">اسم المستخدم</label>
+                    <input id="profile-username" name="username" type="text" value="{{ current_user.username }}" required>
+
+                    <label class="profile-form-label" for="profile-display-name">الاسم الظاهر</label>
+                    <input id="profile-display-name" name="display_name" type="text" value="{{ current_user.display_name or current_user.username }}">
+
+                    <label class="profile-form-label" for="profile-email">البريد الإلكتروني</label>
+                    <input id="profile-email" name="email" type="email" value="{{ current_user.email or '' }}">
+
+                    <div class="profile-password-grid">
+                        <div>
+                            <label class="profile-form-label" for="profile-current-password">كلمة المرور الحالية</label>
+                            <input id="profile-current-password" name="current_password" type="password" placeholder="مطلوبة فقط عند التغيير">
+                        </div>
+                        <div>
+                            <label class="profile-form-label" for="profile-new-password">كلمة المرور الجديدة</label>
+                            <input id="profile-new-password" name="new_password" type="password" placeholder="اتركها فارغة إن لم ترد التغيير">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" type="submit">حفظ التغييرات</button>
+        </form>
+    </div>
+
+    <div class="profile-box profile-social-box" style="margin-top: 20px;">
+        <div class="profile-social-header">
+            <div>
+                <h3 class="profile-section-title">الأصدقاء</h3>
+                <p class="profile-section-subtitle">يتم عرض 5 أصدقاء في كل صفحة مع أسهم للتنقل.</p>
+            </div>
+            <div class="profile-pager" id="friendsPager"></div>
+        </div>
+        <div id="friends-list"></div>
+
+        <div class="profile-social-header profile-social-header-requests">
+            <div>
+                <h3 class="profile-section-title">طلبات الصداقة</h3>
+                <p class="profile-section-subtitle">راجع الطلبات الواردة واقبل أو ارفض مباشرة.</p>
+            </div>
+            <div class="profile-pager" id="requestsPager"></div>
+        </div>
+        <div id="friend-requests"></div>
+
+        <form id="friend-form" class="profile-add-friend-form">
+            <label class="profile-form-label" for="friend-username">إرسال طلب صداقة</label>
+            <div class="profile-add-friend-row">
+                <input type="text" id="friend-username" name="friend_username" placeholder="اسم المستخدم للصديق" required>
+                <button class="btn btn-primary profile-add-friend-button" type="submit">إرسال الطلب</button>
+            </div>
+        </form>
+    </div>
+
     <div style="margin-top: 20px;">
         <form method="post" action="/logout">
             <button class="btn btn-primary" type="submit">تسجيل الخروج</button>
         </form>
     </div>
 </div>
+
+<script>
+const PROFILE_PAGE_SIZE = 5;
+let allFriends = [];
+let allRequests = [];
+let currentFriendsPage = 0;
+let currentRequestsPage = 0;
+
+function escapeProfileHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function getProfileDisplayName(user) {
+    return user.display_name || user.username;
+}
+
+function updateProfileSummary(user) {
+    document.getElementById("profileCurrentUsername").textContent = user.username;
+    document.getElementById("profileCurrentDisplayName").textContent = user.display_name || "-";
+    document.getElementById("profileCurrentEmail").textContent = user.email || "-";
+
+    const avatarPath = `/static/images/${user.profile_image || "profile_img_default.png"}`;
+    const summaryAvatar = document.getElementById("profileSummaryAvatar");
+    const editPreview = document.getElementById("profileEditPreview");
+    if (summaryAvatar) summaryAvatar.src = avatarPath;
+    if (editPreview) editPreview.src = avatarPath;
+}
+
+function buildProfileUserRow(user, actionsHtml = "") {
+    const profileImage = user.profile_image || "profile_img_default.png";
+    return `
+        <tr>
+            <td>
+                <div class="profile-friend-cell">
+                    <img src="/static/images/${escapeProfileHtml(profileImage)}" class="profile-friend-avatar" alt="${escapeProfileHtml(getProfileDisplayName(user))}">
+                    <div class="profile-friend-meta">
+                        <span class="profile-friend-name">${escapeProfileHtml(getProfileDisplayName(user))}</span>
+                        <span class="profile-friend-username">@${escapeProfileHtml(user.username)}</span>
+                    </div>
+                </div>
+            </td>
+            <td>${actionsHtml || '<span class="profile-muted-dash">-</span>'}</td>
+        </tr>
+    `;
+}
+
+function renderProfileTable({ containerId, pagerId, data, emptyMessage, actionsBuilder, page }) {
+    const container = document.getElementById(containerId);
+    const pager = document.getElementById(pagerId);
+    if (!container || !pager) return;
+
+    if (!data.length) {
+        container.innerHTML = `<div class="profile-empty-state">${emptyMessage}</div>`;
+        pager.innerHTML = "";
+        return;
+    }
+
+    const totalPages = Math.ceil(data.length / PROFILE_PAGE_SIZE);
+    const safePage = Math.max(0, Math.min(page, totalPages - 1));
+    const start = safePage * PROFILE_PAGE_SIZE;
+    const pageItems = data.slice(start, start + PROFILE_PAGE_SIZE);
+
+    const rows = pageItems
+        .map((user) => buildProfileUserRow(user, actionsBuilder ? actionsBuilder(user) : ""))
+        .join("");
+
+    container.innerHTML = `
+        <div class="table-wrapper profile-friends-table-wrapper">
+            <table class="bluff-table profile-friends-table">
+                <thead>
+                    <tr>
+                        <th>المستخدم</th>
+                        <th>الإجراء</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+
+    const prevDisabled = safePage === 0 ? "disabled" : "";
+    const nextDisabled = safePage >= totalPages - 1 ? "disabled" : "";
+    const prevHandler = containerId === "friends-list" ? "changeFriendsPage(-1)" : "changeRequestsPage(-1)";
+    const nextHandler = containerId === "friends-list" ? "changeFriendsPage(1)" : "changeRequestsPage(1)";
+
+    pager.innerHTML = `
+        <button type="button" class="profile-page-arrow" onclick="${prevHandler}" ${prevDisabled}>
+            <i class="fa-solid fa-chevron-right"></i>
+        </button>
+        <span class="profile-page-indicator">${safePage + 1} / ${totalPages}</span>
+        <button type="button" class="profile-page-arrow" onclick="${nextHandler}" ${nextDisabled}>
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+    `;
+}
+
+function renderFriends() {
+    renderProfileTable({
+        containerId: "friends-list",
+        pagerId: "friendsPager",
+        data: allFriends,
+        emptyMessage: "لا يوجد أصدقاء حالياً.",
+        actionsBuilder: null,
+        page: currentFriendsPage,
+    });
+}
+
+function renderFriendRequests() {
+    renderProfileTable({
+        containerId: "friend-requests",
+        pagerId: "requestsPager",
+        data: allRequests,
+        emptyMessage: "لا توجد طلبات صداقة.",
+        actionsBuilder: (user) => `
+            <div class="profile-action-group">
+                <button type="button" class="btn btn-primary profile-action-btn" onclick="acceptRequest(${user.id})">قبول</button>
+                <button type="button" class="btn profile-action-btn" onclick="declineRequest(${user.id})">رفض</button>
+            </div>
+        `,
+        page: currentRequestsPage,
+    });
+}
+
+function changeFriendsPage(step) {
+    const totalPages = Math.max(1, Math.ceil(allFriends.length / PROFILE_PAGE_SIZE));
+    currentFriendsPage = Math.max(0, Math.min(currentFriendsPage + step, totalPages - 1));
+    renderFriends();
+}
+
+function changeRequestsPage(step) {
+    const totalPages = Math.max(1, Math.ceil(allRequests.length / PROFILE_PAGE_SIZE));
+    currentRequestsPage = Math.max(0, Math.min(currentRequestsPage + step, totalPages - 1));
+    renderFriendRequests();
+}
+
+async function loadFriends() {
+    try {
+        const response = await fetch('/friends');
+        if (!response.ok) return;
+        allFriends = await response.json();
+        const maxPage = Math.max(0, Math.ceil(allFriends.length / PROFILE_PAGE_SIZE) - 1);
+        currentFriendsPage = Math.min(currentFriendsPage, maxPage);
+        renderFriends();
+    } catch (error) {
+        console.error('Error loading friends:', error);
+    }
+}
+
+async function loadFriendRequests() {
+    try {
+        const response = await fetch('/friends/requests');
+        if (!response.ok) return;
+        allRequests = await response.json();
+        const maxPage = Math.max(0, Math.ceil(allRequests.length / PROFILE_PAGE_SIZE) - 1);
+        currentRequestsPage = Math.min(currentRequestsPage, maxPage);
+        renderFriendRequests();
+    } catch (error) {
+        console.error('Error loading friend requests:', error);
+    }
+}
+
+async function acceptRequest(requesterId) {
+    try {
+        const response = await fetch(`/friends/${requesterId}/accept`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+            await Promise.all([loadFriendRequests(), loadFriends()]);
+            await openAppAlert('تم قبول طلب الصداقة بنجاح.', {
+                title: 'تم التحديث',
+                confirmLabel: 'حسناً',
+            });
+            return;
+        }
+
+        const errorData = await response.json().catch(() => ({}));
+        await openAppAlert(errorData.detail || 'تعذر قبول طلب الصداقة.', {
+            title: 'خطأ',
+            confirmLabel: 'إغلاق',
+            danger: true,
+        });
+    } catch (error) {
+        console.error('Error accepting request:', error);
+    }
+}
+
+async function declineRequest(requesterId) {
+    try {
+        const response = await fetch(`/friends/${requesterId}/decline`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+            await loadFriendRequests();
+            await openAppAlert('تم رفض طلب الصداقة.', {
+                title: 'تم التحديث',
+                confirmLabel: 'حسناً',
+            });
+            return;
+        }
+
+        const errorData = await response.json().catch(() => ({}));
+        await openAppAlert(errorData.detail || 'تعذر رفض طلب الصداقة.', {
+            title: 'خطأ',
+            confirmLabel: 'إغلاق',
+            danger: true,
+        });
+    } catch (error) {
+        console.error('Error declining request:', error);
+    }
+}
+
+async function submitFriendRequest(event) {
+    event.preventDefault();
+
+    const input = document.getElementById('friend-username');
+    const friendUsername = input.value.trim();
+    if (!friendUsername) return;
+
+    const formData = new URLSearchParams();
+    formData.set('friend_username', friendUsername);
+
+    try {
+        const response = await fetch('/friends', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+            input.value = '';
+            await openAppAlert('تم إرسال طلب الصداقة بنجاح.', {
+                title: 'تم الإرسال',
+                confirmLabel: 'حسناً',
+            });
+            return;
+        }
+
+        await openAppAlert(data.detail || 'تعذر إرسال طلب الصداقة.', {
+            title: 'خطأ',
+            confirmLabel: 'إغلاق',
+            danger: true,
+        });
+    } catch (error) {
+        console.error('Error sending friend request:', error);
+        await openAppAlert('تعذر إرسال طلب الصداقة.', {
+            title: 'خطأ',
+            confirmLabel: 'إغلاق',
+            danger: true,
+        });
+    }
+}
+
+function handleProfileImagePreview() {
+    const input = document.getElementById('profile-image-input');
+    const preview = document.getElementById('profileEditPreview');
+    if (!input || !preview || !input.files?.length) return;
+
+    const file = input.files[0];
+    const previewUrl = URL.createObjectURL(file);
+    preview.src = previewUrl;
+}
+
+async function submitProfileUpdate(event) {
+    event.preventDefault();
+
+    const form = document.getElementById('profile-edit-form');
+    if (!form) return;
+
+    const formData = new FormData(form);
+
+    try {
+        const response = await fetch('/profile', {
+            method: 'POST',
+            body: formData,
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            await openAppAlert(data.detail || 'تعذر تحديث الملف الشخصي.', {
+                title: 'خطأ',
+                confirmLabel: 'إغلاق',
+                danger: true,
+            });
+            return;
+        }
+
+        updateProfileSummary(data.user);
+        document.getElementById('profile-current-password').value = '';
+        document.getElementById('profile-new-password').value = '';
+        await openAppAlert('تم تحديث الملف الشخصي بنجاح.', {
+            title: 'تم الحفظ',
+            confirmLabel: 'حسناً',
+        });
+        window.location.reload();
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        await openAppAlert('تعذر تحديث الملف الشخصي.', {
+            title: 'خطأ',
+            confirmLabel: 'إغلاق',
+            danger: true,
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadFriends();
+    loadFriendRequests();
+    document.getElementById('friend-form')?.addEventListener('submit', submitFriendRequest);
+    document.getElementById('profile-edit-form')?.addEventListener('submit', submitProfileUpdate);
+    document.getElementById('profile-image-input')?.addEventListener('change', handleProfileImagePreview);
+});
+</script>
 {% endblock %}

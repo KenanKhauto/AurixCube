@@ -1,13 +1,22 @@
 """Authentication routes."""
 
-from fastapi import APIRouter, Depends, Form, Request
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from starlette import status
 
-from app.auth.dependencies import get_current_user_optional
-from app.auth.schemas import RegisterRequest
+from app.auth.dependencies import get_current_user, get_current_user_optional
+from app.auth.schemas import (
+    GameInviteResponse,
+    ProfileUpdateResponse,
+    RegisterRequest,
+    RespondGameInviteRequest,
+    SendGameInviteRequest,
+    UserResponse,
+)
 from app.auth.service import AuthService
 from app.db.models.user import User
 from app.db.session import get_db
@@ -25,6 +34,8 @@ def login_page(
     """
     Render the login page.
     """
+    if current_user:
+        return RedirectResponse(url="/profile", status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(
         request,
         "login.html",
@@ -68,6 +79,8 @@ def register_page(
     """
     Render the registration page.
     """
+    if current_user:
+        return RedirectResponse(url="/profile", status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(
         request,
         "register.html",
@@ -120,3 +133,181 @@ def logout_user(request: Request):
     """
     request.session.clear()
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/friends")
+def add_friend(
+    friend_username: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Add a friend.
+    """
+    try:
+        auth_service.add_friend(db, current_user.id, friend_username)
+        return {"message": "Friend request sent successfully."}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/profile", response_model=ProfileUpdateResponse)
+async def update_profile(
+    username: str = Form(...),
+    display_name: str = Form(default=""),
+    email: str = Form(default=""),
+    current_password: str = Form(default=""),
+    new_password: str = Form(default=""),
+    profile_image: UploadFile | None = File(default=None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update the authenticated user's profile details."""
+    image_bytes = None
+    image_extension = None
+
+    if profile_image and profile_image.filename:
+        image_bytes = await profile_image.read()
+        image_extension = Path(profile_image.filename).suffix.lower()
+
+    try:
+        user = auth_service.update_profile(
+            db=db,
+            user_id=current_user.id,
+            username=username,
+            display_name=display_name or None,
+            email=email or None,
+            current_password=current_password or None,
+            new_password=new_password or None,
+            profile_image_bytes=image_bytes,
+            profile_image_extension=image_extension,
+        )
+        return ProfileUpdateResponse(
+            message="Profile updated successfully.",
+            user=UserResponse.model_validate(user),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _serialize_game_invite(invite) -> GameInviteResponse:
+    return GameInviteResponse(
+        id=invite.id,
+        game_key=invite.game_key,
+        room_code=invite.room_code,
+        status=invite.status,
+        sender=UserResponse.model_validate(invite.sender),
+        recipient=UserResponse.model_validate(invite.recipient),
+        created_at=invite.created_at.isoformat(),
+    )
+
+
+@router.get("/friends")
+def get_friends(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get list of friends.
+    """
+    friends = auth_service.get_friends(db, current_user.id)
+    return [UserResponse.model_validate(friend) for friend in friends]
+
+
+@router.get("/invites", response_model=list[GameInviteResponse])
+def get_game_invites(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get game invite notifications for the current user."""
+    invites = auth_service.get_game_invites(db, current_user.id)
+    return [_serialize_game_invite(invite) for invite in invites]
+
+
+@router.post("/invites", response_model=GameInviteResponse)
+def send_game_invite(
+    payload: SendGameInviteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Send a game invite to a friend."""
+    try:
+        invite = auth_service.send_game_invite(
+            db=db,
+            sender_id=current_user.id,
+            recipient_id=payload.recipient_id,
+            game_key=payload.game_key,
+            room_code=payload.room_code,
+        )
+        return _serialize_game_invite(invite)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/invites/{invite_id}/respond")
+def respond_to_game_invite(
+    invite_id: int,
+    payload: RespondGameInviteRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Accept or reject a game invite notification."""
+    try:
+        invite = auth_service.respond_to_game_invite(
+            db=db,
+            user_id=current_user.id,
+            invite_id=invite_id,
+            action=payload.action,
+        )
+        result = {"message": "Invite updated.", "invite": _serialize_game_invite(invite).model_dump()}
+        if payload.action == "accept":
+            result["redirect_path"] = auth_service.get_game_invite_path(invite.game_key)
+            result["room_code"] = invite.room_code
+            result["game_key"] = invite.game_key
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/friends/requests")
+def get_friend_requests(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get list of pending friend requests.
+    """
+    requests = auth_service.get_pending_requests(db, current_user.id)
+    return [UserResponse.model_validate(requester) for requester in requests]
+
+
+@router.post("/friends/{requester_id}/accept")
+def accept_friend_request(
+    requester_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Accept a friend request.
+    """
+    try:
+        auth_service.accept_friend_request(db, current_user.id, requester_id)
+        return {"message": "Friend request accepted."}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/friends/{requester_id}/decline")
+def decline_friend_request(
+    requester_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Decline a friend request.
+    """
+    try:
+        auth_service.decline_friend_request(db, current_user.id, requester_id)
+        return {"message": "Friend request declined."}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -1330,3 +1330,50 @@ setInterval(async () => {
         }
     }
 }, 10000);
+
+function ensureWhoAmIInviteButton() {
+    if (!window.appCurrentUser || !isHost || !currentRoomCode) return;
+
+    const hostArea = document.getElementById("adminArea");
+    if (!hostArea || hostArea.querySelector(".invite-friends-btn")) return;
+
+    const inviteButton = document.createElement("button");
+    inviteButton.type = "button";
+    inviteButton.className = "btn invite-friends-btn";
+    inviteButton.textContent = "دعوة الأصدقاء";
+    inviteButton.onclick = () => openInviteFriendsModal("who_am_i", currentRoomCode);
+    hostArea.insertBefore(inviteButton, hostArea.firstChild);
+}
+
+const originalWhoAmIRenderWaitingRoom = renderWaitingRoom;
+renderWaitingRoom = function(data) {
+    originalWhoAmIRenderWaitingRoom(data);
+    ensureWhoAmIInviteButton();
+};
+
+async function maybeAutoJoinWhoAmIInvite() {
+    if (!window.appCurrentUser || currentRoomCode || currentPlayerId) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const inviteRoom = params.get("invite_room");
+    const accepted = params.get("invite_accept");
+    if (!inviteRoom || accepted !== "1") return;
+
+    const preferredName = (window.appCurrentUser.display_name || window.appCurrentUser.username || "").trim();
+    if (preferredName) {
+        currentPlayerName = preferredName;
+        localStorage.setItem("whoami_player_name", preferredName);
+        const nameInput = document.getElementById("pName");
+        if (nameInput) nameInput.value = preferredName;
+    }
+
+    const roomInput = document.getElementById("roomInput");
+    if (roomInput) roomInput.value = inviteRoom;
+
+    history.replaceState({}, "", location.pathname);
+    await joinRoom();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    maybeAutoJoinWhoAmIInvite();
+});

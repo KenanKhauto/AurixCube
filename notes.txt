@@ -3,3 +3,4 @@
 
 --- bluff, we want to see who submitted which answer it should be shown on the table..
 
+--- in bluff, the correct answer should show as green.

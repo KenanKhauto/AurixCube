@@ -2,9 +2,12 @@
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user, get_current_user_optional
+from app.auth.service import AuthService
 from app.db.models.user import User
+from app.db.session import get_db
 from app.games.registry import GAMES
 
 
@@ -70,14 +73,18 @@ def about_page(
 def profile_page(
     request: Request,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """Render the profile page for the authenticated user."""
+    auth_service = AuthService()
+    friends = auth_service.get_friends(db, current_user.id)
     return templates.TemplateResponse(
         request,
         "profile.html",
         {
             "request": request,
             "current_user": current_user,
+            "friends": friends,
         },
     )
 

@@ -1559,3 +1559,50 @@ setInterval(() => {
         updateDrawLiveTimer(currentDrawRoomData);
     }
 }, 1000);
+
+function ensureDrawInviteButton() {
+    if (!window.appCurrentUser || !drawIsHost || !currentDrawRoomCode) return;
+
+    const hostArea = document.getElementById("drawHostArea");
+    if (!hostArea || hostArea.querySelector(".invite-friends-btn")) return;
+
+    const inviteButton = document.createElement("button");
+    inviteButton.type = "button";
+    inviteButton.className = "btn invite-friends-btn";
+    inviteButton.textContent = "دعوة الأصدقاء";
+    inviteButton.onclick = () => openInviteFriendsModal("draw_guess", currentDrawRoomCode);
+    hostArea.insertBefore(inviteButton, hostArea.firstChild);
+}
+
+const originalRenderDrawWaitingRoom = renderDrawWaitingRoom;
+renderDrawWaitingRoom = function(data) {
+    originalRenderDrawWaitingRoom(data);
+    ensureDrawInviteButton();
+};
+
+async function maybeAutoJoinDrawInvite() {
+    if (!window.appCurrentUser || currentDrawRoomCode || currentDrawPlayerId) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const inviteRoom = params.get("invite_room");
+    const accepted = params.get("invite_accept");
+    if (!inviteRoom || accepted !== "1") return;
+
+    const preferredName = (window.appCurrentUser.display_name || window.appCurrentUser.username || "").trim();
+    if (preferredName) {
+        currentDrawPlayerName = preferredName;
+        localStorage.setItem("draw_player_name", preferredName);
+        const nameInput = document.getElementById("drawName");
+        if (nameInput) nameInput.value = preferredName;
+    }
+
+    const roomInput = document.getElementById("drawRoomInput");
+    if (roomInput) roomInput.value = inviteRoom;
+
+    history.replaceState({}, "", location.pathname);
+    await joinDrawRoom();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    maybeAutoJoinDrawInvite();
+});
