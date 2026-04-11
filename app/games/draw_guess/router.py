@@ -11,10 +11,12 @@ from app.games.draw_guess.schemas import (
     DrawGuessJoinRoomRequest,
     DrawGuessLeaveRoomRequest,
     DrawGuessPlayerView,
+    DrawGuessRemovePlayerRequest,
     DrawGuessRestartGameRequest,
     DrawGuessRoomStateResponse,
     DrawGuessSelectWordRequest,
     DrawGuessStrokeView,
+    DrawGuessUpdateCategoriesRequest,
     DrawGuessWordOptionView,
 )
 from app.games.draw_guess.service import DrawGuessGameService
@@ -38,6 +40,7 @@ def build_room_response(room) -> DrawGuessRoomStateResponse:
         round_timer_seconds=room.round_timer_seconds,
         started=room.started,
         ended=room.ended,
+        end_reason=room.end_reason,
         winner_ids=room.winner_ids,
         current_round=room.current_round,
         phase=room.phase,
@@ -177,6 +180,24 @@ def leave_room(room_code: str, payload: DrawGuessLeaveRoomRequest):
         room = service.leave_room(room_code, payload.player_id)
         if room is None:
             return {"message": "Room became empty and was deleted."}
+        return build_room_response(room)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rooms/{room_code}/remove-player", response_model=DrawGuessRoomStateResponse)
+def remove_player(room_code: str, payload: DrawGuessRemovePlayerRequest):
+    try:
+        room = service.remove_player(room_code, payload.host_id, payload.player_id_to_remove)
+        return build_room_response(room)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rooms/{room_code}/categories", response_model=DrawGuessRoomStateResponse)
+def update_categories(room_code: str, payload: DrawGuessUpdateCategoriesRequest):
+    try:
+        room = service.update_categories(room_code, payload.host_id, payload.categories)
         return build_room_response(room)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

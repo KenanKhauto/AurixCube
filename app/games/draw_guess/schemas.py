@@ -12,7 +12,7 @@ class DrawGuessCreateRoomRequest(BaseModel):
     character_id: str = "char1"
     max_player_count: int = Field(..., ge=2, le=10)
     total_rounds: int = Field(..., ge=1, le=20)
-    categories: List[str]
+    categories: List[str] = Field(default_factory=list, max_length=12)
     language: str = Field("en", pattern="^(en|ar)$")
     round_timer_seconds: int = Field(60, ge=30, le=120)
 
@@ -44,6 +44,16 @@ class DrawGuessLeaveRoomRequest(BaseModel):
 
 class DrawGuessDeleteRoomRequest(BaseModel):
     player_id: str
+
+
+class DrawGuessRemovePlayerRequest(BaseModel):
+    host_id: str
+    player_id_to_remove: str
+
+
+class DrawGuessUpdateCategoriesRequest(BaseModel):
+    host_id: str
+    categories: List[str] = Field(default_factory=list, max_length=12)
 
 
 class DrawGuessPlayerView(BaseModel):
@@ -86,6 +96,7 @@ class DrawGuessRoomStateResponse(BaseModel):
 
     started: bool
     ended: bool
+    end_reason: Optional[str] = None
     winner_ids: List[str]
 
     current_round: int
@@ -102,5 +113,6 @@ class DrawGuessRoomStateResponse(BaseModel):
 
     players: List[DrawGuessPlayerView]
     guesses: List[DrawGuessGuessMessageView]
+    strokes: List[DrawGuessStrokeView]
     current_word_en: Optional[str]
     current_word_ar: Optional[str]

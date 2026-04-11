@@ -9,7 +9,7 @@ class CreateRoomRequest(BaseModel):
 
     host_name: str = Field(..., min_length=1, max_length=50)
     max_player_count: int = Field(..., ge=2, le=12)
-    categories: list[str] = Field(..., min_length=1, max_length=12)
+    categories: list[str] = Field(default_factory=list, max_length=12)
     character_id: str = "char1"
 
 class JoinRoomRequest(BaseModel):
@@ -43,6 +43,13 @@ class RestartRoomRequest(BaseModel):
     categories: list[str]
 
 
+class UpdateCategoriesRequest(BaseModel):
+    """Request body for updating waiting-room categories."""
+
+    host_id: str
+    categories: list[str] = Field(default_factory=list, max_length=12)
+
+
 class LeaveRoomRequest(BaseModel):
     """Request body for leaving a room."""
 
@@ -53,6 +60,13 @@ class DeleteRoomRequest(BaseModel):
     """Request body for deleting a room."""
 
     player_id: str
+
+
+class RemovePlayerRequest(BaseModel):
+    """Request body for removing a player."""
+
+    host_id: str
+    player_id_to_remove: str
 
 
 class PlayerView(BaseModel):
@@ -75,6 +89,7 @@ class RoomStateResponse(BaseModel):
     max_player_count: int
     started: bool
     ended: bool
+    end_reason: Optional[str] = None
 
     reveal_phase_active: bool
     reveal_order: List[str]

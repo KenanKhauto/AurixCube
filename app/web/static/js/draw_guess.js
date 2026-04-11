@@ -9,6 +9,7 @@ let lastRenderedDrawSignature = null;
 let selectedDrawPlayerCount = null;
 let selectedDrawRounds = null;
 let selectedDrawCategories = [];
+let allDrawCategories = [];
 let selectedDrawLanguage = "en";
 let selectedDrawTimer = 60;
 let selectedDrawCharacter = localStorage.getItem("draw_character_id") || "char1";
@@ -42,6 +43,32 @@ function showDrawError(message) {
 function hideDrawError() {
     const errorDiv = document.getElementById('draw-global-error');
     errorDiv.classList.add('hidden');
+}
+
+async function handleDrawRoomExit(message) {
+    clearDrawLocalState();
+    await openAppAlert(message, {
+        title: "تمت إزالتك",
+        confirmLabel: "الخروج",
+        danger: true,
+    });
+    window.location.reload();
+}
+
+function ensureCurrentDrawPlayerStillInRoom(data) {
+    if ((data.players || []).some((player) => player.id === currentDrawPlayerId)) {
+        return true;
+    }
+
+    handleDrawRoomExit("تمت إزالتك من الغرفة.");
+    return false;
+}
+
+function buildDrawRemoveActionCell(playerId, showActions = true) {
+    if (showActions && drawIsHost && playerId !== currentDrawPlayerId) {
+        return `<td><button class="btn btn-danger" onclick="removeDrawPlayer('${playerId}')">حذف</button></td>`;
+    }
+    return "<td></td>";
 }
 
 const drawCategoryLabels = {
@@ -939,7 +966,12 @@ async function leaveDrawRoom() {
 }
 
 async function deleteDrawRoom() {
-    const confirmed = confirm("هل أنت متأكد أنك تريد حذف الغرفة بالكامل؟");
+    const confirmed = await openAppConfirm("هل أنت متأكد أنك تريد حذف الغرفة بالكامل؟", {
+        title: "حذف الغرفة",
+        confirmLabel: "حذف الغرفة",
+        cancelLabel: "إلغاء",
+        danger: true,
+    });
     if (!confirmed) return;
 
     const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/delete`, {
@@ -959,13 +991,49 @@ async function deleteDrawRoom() {
     window.location.reload();
 }
 
+async function removeDrawPlayer(playerIdToRemove) {
+    const confirmed = await openAppConfirm("هل أنت متأكد أنك تريد حذف هذا اللاعب من الغرفة؟", {
+        title: "حذف لاعب",
+        confirmLabel: "حذف اللاعب",
+        cancelLabel: "إلغاء",
+        danger: true,
+    });
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/remove-player`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            host_id: currentDrawPlayerId,
+            player_id_to_remove: playerIdToRemove
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showDrawError(data.detail || "تعذر حذف اللاعب.");
+        return;
+    }
+
+    hideDrawError();
+    renderDrawState(data);
+}
+
 async function refreshDrawRoomState() {
     if (!currentDrawRoomCode) return;
 
     const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}`);
-    if (!response.ok) return;
+    if (!response.ok) {
+        if (response.status === 404) {
+            await handleDrawRoomExit("تم حذف الغرفة أو لم تعد متاحة.");
+        }
+        return;
+    }
 
     const data = await response.json();
+    if (!ensureCurrentDrawPlayerStillInRoom(data)) return;
+
     currentDrawRoomData = data;
     drawIsHost = currentDrawPlayerId === data.host_id;
 
@@ -1082,6 +1150,7 @@ function renderDrawWaitingRoom(data) {
             row.innerHTML = `
                 <td>${buildDrawPlayerIdentity(player)}</td>
                 <td>${player.score}</td>
+                ${buildDrawRemoveActionCell(player.id)}
             `;
             tbody.appendChild(row);
         });
@@ -1128,7 +1197,7 @@ function renderDrawWordChoice(data) {
         box.innerHTML = `<p style="color:#aaa; text-align:center;">بانتظار اختيار الكلمة...</p>`;
     }
 
-    renderDrawScoreboard(data.players, "drawScoreboardChoice");
+    renderDrawScoreboard(data.players, "drawScoreboardChoice", true);
 }
 
 function renderDrawPlay(data, previousData) {
@@ -1209,6 +1278,7 @@ function renderDrawPlayersState(data) {
             <td>${buildDrawPlayerIdentity(player)}</td>
             <td>${statusText}</td>
             <td>${player.score}</td>
+            ${buildDrawRemoveActionCell(player.id)}
         `;
         tbody.appendChild(row);
     });
@@ -1286,6 +1356,7 @@ function renderDrawRankingResultTable(data) {
             <td>${buildDrawPlayerIdentity(player)}</td>
             <td>${player.score}</td>
             <td>${delta > 0 ? `+${delta}` : "-"}</td>
+            ${buildDrawRemoveActionCell(player.id)}
         `;
         tbody.appendChild(row);
     });
@@ -1311,6 +1382,7 @@ function renderDrawGameOver(data) {
                     <td>${index + 1}</td>
                     <td>${buildDrawPlayerIdentity(player)}</td>
                     <td>${player.score}</td>
+                    ${buildDrawRemoveActionCell(player.id)}
                 `;
                 tbody.appendChild(row);
             });
@@ -1350,6 +1422,7 @@ function renderDrawGameOver(data) {
                 <td>${index + 1}</td>
                 <td>${buildDrawPlayerIdentity(player)}</td>
                 <td>${player.score}</td>
+                ${buildDrawRemoveActionCell(player.id)}
             `;
             tbody.appendChild(row);
         });
@@ -1363,7 +1436,7 @@ function renderDrawGameOver(data) {
     }
 }
 
-function renderDrawScoreboard(players, containerId) {
+function renderDrawScoreboard(players, containerId, showActions = false) {
     const tbody = document.getElementById(containerId);
     if (!tbody) return;
 
@@ -1376,6 +1449,7 @@ function renderDrawScoreboard(players, containerId) {
             row.innerHTML = `
                 <td>${buildDrawPlayerIdentity(player)}</td>
                 <td>${player.score}</td>
+                ${buildDrawRemoveActionCell(player.id, showActions)}
             `;
             tbody.appendChild(row);
         });
@@ -1432,6 +1506,275 @@ function hideAllDrawScreens() {
         const el = document.getElementById(id);
         if (el) el.classList.add("hidden");
     });
+}
+
+async function loadDrawCategories() {
+    const response = await fetch("/api/draw-guess/categories");
+    const data = await response.json();
+    allDrawCategories = data.categories || [];
+}
+
+async function toggleDrawCategory(categoryKey) {
+    if (!drawIsHost || currentDrawRoomData?.started) {
+        return;
+    }
+
+    const exists = selectedDrawCategories.includes(categoryKey);
+    let nextCategories;
+
+    if (exists) {
+        nextCategories = selectedDrawCategories.filter((c) => c !== categoryKey);
+    } else {
+        if (selectedDrawCategories.length >= MAX_DRAW_CATEGORIES) {
+            showDrawError(`يمكنك اختيار ${MAX_DRAW_CATEGORIES} تصنيفات كحد أقصى`);
+            return;
+        }
+        nextCategories = [...selectedDrawCategories, categoryKey];
+    }
+
+    const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/categories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            host_id: currentDrawPlayerId,
+            categories: nextCategories
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showDrawError(data.detail || "\u062A\u0639\u0630\u0631 \u062A\u062D\u062F\u064A\u062B \u0627\u0644\u062A\u0635\u0646\u064A\u0641\u0627\u062A.");
+        return;
+    }
+
+    currentDrawRoomData = data;
+    selectedDrawCategories = [...(data.categories || [])];
+    drawIsHost = currentDrawPlayerId === data.host_id;
+    lastRenderedDrawSignature = null;
+    renderDrawWaitingRoom(data);
+}
+
+function updateDrawCategoryButtonsState() {
+    const info = document.getElementById("drawCategorySelectionInfo");
+    const canEdit = drawIsHost && currentDrawRoomData && !currentDrawRoomData.started;
+    if (info) {
+        info.textContent = `تم اختيار ${selectedDrawCategories.length} / ${MAX_DRAW_CATEGORIES}`;
+    }
+
+    document.querySelectorAll("#drawCategoryGrid .category-btn").forEach((btn) => {
+        const key = btn.dataset.categoryKey;
+        const isSelected = selectedDrawCategories.includes(key);
+        btn.classList.toggle("active", isSelected);
+
+        if (!canEdit) {
+            btn.classList.add("disabled");
+            btn.disabled = true;
+            return;
+        }
+
+        if (!isSelected && selectedDrawCategories.length >= MAX_DRAW_CATEGORIES) {
+            btn.classList.add("disabled");
+            btn.disabled = true;
+        } else {
+            btn.classList.remove("disabled");
+            btn.disabled = false;
+        }
+    });
+}
+
+function renderDrawPregameCategories(data) {
+    const container = document.getElementById("drawCategoryGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    allDrawCategories.forEach((key) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.categoryKey = key;
+        button.textContent = drawCategoryLabels[key] || key;
+        button.onclick = () => toggleDrawCategory(key);
+        container.appendChild(button);
+    });
+
+    const info = document.getElementById("drawCategorySelectionInfo");
+    if (info && !drawIsHost) {
+        info.textContent = data.categories?.length
+            ? `\u0627\u0644\u0645\u0646\u0638\u0645 \u064A\u062E\u062A\u0627\u0631 \u0627\u0644\u062A\u0635\u0646\u064A\u0641\u0627\u062A \u0627\u0644\u0622\u0646: ${data.categories.length} / ${MAX_DRAW_CATEGORIES}`
+            : `\u0627\u0644\u0645\u0646\u0638\u0645 \u0644\u0645 \u064A\u062E\u062A\u0631 \u0623\u064A \u062A\u0635\u0646\u064A\u0641 \u0628\u0639\u062F`;
+    }
+
+    updateDrawCategoryButtonsState();
+}
+
+async function createDrawRoom() {
+    const hostName = document.getElementById("drawName").value.trim();
+
+    if (!hostName) {
+        showDrawError("الرجاء إدخال الاسم أولاً!");
+        return;
+    }
+    if (!selectedDrawPlayerCount) {
+        showDrawError("اختر عدد اللاعبين أولاً!");
+        return;
+    }
+    if (!selectedDrawRounds) {
+        showDrawError("اختر عدد الجولات أولاً!");
+        return;
+    }
+    if (selectedDrawRounds < selectedDrawPlayerCount) {
+        showDrawError("عدد الجولات يجب أن يكون على الأقل بعدد اللاعبين.");
+        return;
+    }
+
+    const response = await fetch("/api/draw-guess/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            host_name: hostName,
+            character_id: selectedDrawCharacter,
+            max_player_count: selectedDrawPlayerCount,
+            total_rounds: selectedDrawRounds,
+            categories: [],
+            language: selectedDrawLanguage,
+            round_timer_seconds: selectedDrawTimer
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showDrawError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        return;
+    }
+
+    currentDrawRoomCode = data.room_code;
+    currentDrawPlayerId = data.host_id;
+    currentDrawPlayerName = hostName;
+    currentDrawRoomData = data;
+    drawIsHost = true;
+    selectedDrawCategories = [...(data.categories || [])];
+    lastRenderedDrawSignature = null;
+
+    localStorage.setItem("draw_room_code", currentDrawRoomCode);
+    localStorage.setItem("draw_player_id", currentDrawPlayerId);
+    localStorage.setItem("draw_player_name", currentDrawPlayerName);
+
+    connectDrawWS(currentDrawRoomCode);
+    renderDrawWaitingRoom(data);
+}
+
+async function startDrawGame() {
+    if (!currentDrawRoomData?.categories?.length) {
+        showDrawError("اختر تصنيفًا واحدًا على الأقل قبل بدء اللعبة.");
+        return;
+    }
+
+    const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/start`, {
+        method: "POST"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showDrawError(data.detail || "تعذر بدء اللعبة.");
+        return;
+    }
+
+    currentDrawRoomData = data;
+    lastRenderedDrawSignature = null;
+    renderDrawState(data);
+}
+
+async function restartDrawGame() {
+    const categories = selectedDrawCategories.length > 0
+        ? selectedDrawCategories
+        : currentDrawRoomData?.categories || [];
+
+    const totalRounds = selectedDrawRounds || currentDrawRoomData?.total_rounds;
+    const language = selectedDrawLanguage || currentDrawRoomData?.language || "en";
+    const timer = selectedDrawTimer || currentDrawRoomData?.round_timer_seconds || 60;
+
+    const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/restart`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            categories,
+            total_rounds: totalRounds,
+            language,
+            round_timer_seconds: timer
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showDrawError(data.detail || "تعذر إعادة اللعبة.");
+        return;
+    }
+
+    currentDrawRoomData = data;
+    selectedDrawCategories = [...(data.categories || [])];
+    lastRenderedDrawSignature = null;
+    renderDrawWaitingRoom(data);
+}
+
+function buildDrawStateSignature(data) {
+    const playersSignature = data.players
+        .map((p) => `${p.id}:${p.score}`)
+        .join("|");
+
+    return JSON.stringify({
+        started: data.started,
+        ended: data.ended,
+        phase: data.phase,
+        current_round: data.current_round,
+        current_drawer_id: data.current_drawer_id,
+        phase_deadline_at: data.phase_deadline_at,
+        guessed_correctly_player_ids: data.guessed_correctly_player_ids,
+        last_round_word_en: data.last_round_word_en,
+        last_round_word_ar: data.last_round_word_ar,
+        last_round_score_changes: data.last_round_score_changes,
+        categories: (data.categories || []).join(","),
+        players: playersSignature
+    });
+}
+
+function renderDrawWaitingRoom(data) {
+    hideAllDrawScreens();
+    document.getElementById("screen-draw-wait").classList.remove("hidden");
+    currentDrawRoomData = data;
+    selectedDrawCategories = [...(data.categories || [])];
+    document.getElementById("drawDisplayCode").textContent = data.room_code;
+
+    const tbody = document.getElementById("drawPlayerList");
+    tbody.innerHTML = "";
+
+    [...data.players]
+        .sort((a, b) => b.score - a.score)
+        .forEach((player) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${buildDrawPlayerIdentity(player)}</td>
+                <td>${player.score}</td>
+                ${buildDrawRemoveActionCell(player.id)}
+            `;
+            tbody.appendChild(row);
+        });
+
+    renderDrawPregameCategories(data);
+
+    if (drawIsHost) {
+        document.getElementById("drawHostArea").classList.remove("hidden");
+        document.getElementById("drawMemberArea").classList.add("hidden");
+        document.getElementById("drawWaitMsg").classList.add("hidden");
+    } else {
+        document.getElementById("drawHostArea").classList.add("hidden");
+        document.getElementById("drawMemberArea").classList.remove("hidden");
+        document.getElementById("drawWaitMsg").classList.remove("hidden");
+    }
 }
 
 function clearDrawLocalState() {

@@ -28,9 +28,6 @@
         <label>عدد اللاعبين:</label>
         <div id="playerCountGrid" class="category-grid"></div>
 
-        <label>التصنيفات (اختر حتى 12):</label>
-        <div id="categoryGrid" class="category-grid"></div>
-
         <button class="btn btn-primary" onclick="createRoom()">تأكيد الإعدادات</button>
         <button class="btn" onclick="goBackToLobby()">رجوع</button>
     </div>
@@ -46,6 +43,12 @@
                 </thead>
                 <tbody id="playerList"></tbody>
             </table>
+        </div>
+
+        <div id="whoamiPregameCategories" style="margin: 18px 0;">
+            <label>التصنيفات (اختر حتى 12):</label>
+            <div id="categorySelectionInfo" style="color:#aaa; margin-bottom:10px;">تم اختيار 0 / 12</div>
+            <div id="categoryGrid" class="category-grid"></div>
         </div>
 
         <div id="adminArea" class="hidden">

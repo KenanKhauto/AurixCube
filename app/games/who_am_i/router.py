@@ -10,10 +10,12 @@ from app.games.who_am_i.schemas import (
     JoinRoomRequest,
     LeaveRoomRequest,
     PlayerView,
+    RemovePlayerRequest,
     RestartRoomRequest,
     RevealIdentityRequest,
     RoomStateResponse,
     SubmitGuessRequest,
+    UpdateCategoriesRequest,
     RevealViewRequest,
     PlayerKnowledgeViewRequest,
 )
@@ -32,6 +34,7 @@ def build_room_response(room) -> RoomStateResponse:
         max_player_count=room.max_player_count,
         started=room.started,
         ended=room.ended,
+        end_reason=room.end_reason,
         reveal_phase_active=room.reveal_phase_active,
         reveal_order=room.reveal_order,
         current_reveal_player_id=room.current_reveal_player_id,
@@ -91,6 +94,26 @@ def leave_room(room_code: str, payload: LeaveRoomRequest):
         room = service.leave_room(room_code, payload.player_id)
         if room is None:
             return {"message": "Room became empty and was deleted."}
+        return build_room_response(room)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rooms/{room_code}/remove-player", response_model=RoomStateResponse)
+def remove_player(room_code: str, payload: RemovePlayerRequest):
+    """Allow the host to remove a player from the room."""
+    try:
+        room = service.remove_player(room_code, payload.host_id, payload.player_id_to_remove)
+        return build_room_response(room)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rooms/{room_code}/categories", response_model=RoomStateResponse)
+def update_categories(room_code: str, payload: UpdateCategoriesRequest):
+    """Allow the host to update categories before the game starts."""
+    try:
+        room = service.update_categories(room_code, payload.host_id, payload.categories)
         return build_room_response(room)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

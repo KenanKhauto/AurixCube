@@ -8,6 +8,7 @@ let currentGuessDraft = "";
 let lastRoomSnapshot = null;
 let currentPlayerKnowledge = [];
 let selectedCategories = [];
+let allWhoAmICategories = [];
 const MAX_CATEGORIES = 12;
 let selectedPlayerCount = null;
 let selectedCharacter = localStorage.getItem("whoami_character_id") || "char1";
@@ -116,6 +117,87 @@ function buildWhoAmIPlayerIdentity(player) {
     `;
 }
 
+function renderRevealPlayersState(data) {
+    let container = document.getElementById("revealPlayersState");
+    if (!container) {
+        const screen = document.getElementById("screen-reveal");
+        const controls = document.querySelector("#screen-reveal > div[style*='margin-top:20px']");
+        if (!screen) return;
+        container = document.createElement("div");
+        container.id = "revealPlayersState";
+        container.style.marginTop = "20px";
+        if (controls) {
+            screen.insertBefore(container, controls);
+        } else {
+            screen.appendChild(container);
+        }
+    }
+
+    const currentRevealIndex = data.reveal_order.indexOf(data.current_reveal_player_id);
+    const rows = data.players.map((player) => {
+        const playerRevealIndex = data.reveal_order.indexOf(player.id);
+
+        let statusText = "بانتظار الدور";
+        if (player.id === data.current_reveal_player_id) {
+            statusText = "يكشف الآن";
+        } else if (playerRevealIndex !== -1 && currentRevealIndex !== -1 && playerRevealIndex < currentRevealIndex) {
+            statusText = "تم الكشف";
+        }
+
+        return `
+            <tr>
+                <td>${buildWhoAmIPlayerIdentity(player)}</td>
+                <td>${statusText}</td>
+                ${buildWhoAmIRemoveActionCell(player.id)}
+            </tr>
+        `;
+    }).join("");
+
+    container.innerHTML = `
+        <h4>اللاعبون</h4>
+        <div class="table-wrapper">
+            <table class="bluff-table whoami-players-table">
+                <thead>
+                    <tr>
+                        <th>اللاعب</th>
+                        <th>الحالة</th>
+                        <th>${isHost ? "الإجراء" : ""}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+async function handleWhoAmIRoomExit(message) {
+    clearLocalGameState();
+    await openAppAlert(message, {
+        title: "تمت إزالتك",
+        confirmLabel: "الخروج",
+        danger: true,
+    });
+    window.location.reload();
+}
+
+function ensureCurrentWhoAmIPlayerStillInRoom(data) {
+    if ((data.players || []).some((player) => player.id === currentPlayerId)) {
+        return true;
+    }
+
+    handleWhoAmIRoomExit("تمت إزالتك من الغرفة.");
+    return false;
+}
+
+function buildWhoAmIRemoveActionCell(playerId, showActions = true) {
+    if (showActions && isHost && playerId !== currentPlayerId) {
+        return `<td><button class="btn btn-danger" onclick="removeWhoAmIPlayer('${playerId}')">حذف</button></td>`;
+    }
+    return "<td></td>";
+}
+
 
 function renderPlayerCountButtons() {
     const container = document.getElementById("playerCountGrid");
@@ -162,29 +244,7 @@ function updatePlayerCountButtonsState() {
 async function loadCategories() {
     const response = await fetch("/api/who-am-i/categories");
     const data = await response.json();
-
-    const container = document.getElementById("categoryGrid");
-    if (!container) return;
-
-    container.innerHTML = "";
-
-    Object.keys(data.categories).forEach((key) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "category-btn";
-        button.dataset.categoryKey = key;
-        button.textContent = categoryLabels[key] || key;
-
-        if (selectedCategories.includes(key)) {
-            button.classList.add("active");
-        }
-
-        button.onclick = () => toggleCategory(key);
-
-        container.appendChild(button);
-    });
-
-    updateCategoryButtonsState();
+    allWhoAmICategories = Object.keys(data.categories || {});
 }
 
 
@@ -498,7 +558,12 @@ async function leaveCurrentRoom() {
 }
 
 async function deleteCurrentRoom() {
-    const confirmed = confirm("هل أنت متأكد أنك تريد حذف الغرفة بالكامل؟");
+    const confirmed = await openAppConfirm("هل أنت متأكد أنك تريد حذف الغرفة بالكامل؟", {
+        title: "حذف الغرفة",
+        confirmLabel: "حذف الغرفة",
+        cancelLabel: "إلغاء",
+        danger: true,
+    });
     if (!confirmed) return;
 
     const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/delete`, {
@@ -516,6 +581,65 @@ async function deleteCurrentRoom() {
 
     clearLocalGameState();
     goBackToLobby();
+}
+
+async function removeWhoAmIPlayer(playerIdToRemove) {
+    const confirmed = await openAppConfirm("هل أنت متأكد أنك تريد حذف هذا اللاعب من الغرفة؟", {
+        title: "حذف لاعب",
+        confirmLabel: "حذف اللاعب",
+        cancelLabel: "إلغاء",
+        danger: true,
+    });
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/remove-player`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            host_id: currentPlayerId,
+            player_id_to_remove: playerIdToRemove
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        const errorDetail = data.detail || "";
+
+        if (errorDetail === "Player not found.") {
+            await handleWhoAmIRoomExit("تمت إزالتك من الغرفة.");
+            return;
+        }
+
+        if (errorDetail === "Room not found.") {
+            await handleWhoAmIRoomExit("تم حذف الغرفة أو لم تعد متاحة.");
+            return;
+        }
+        showWhoAmIError(data.detail || "تعذر حذف اللاعب من الغرفة.");
+        return;
+    }
+
+    currentRoomData = data;
+    isHost = currentPlayerId === data.host_id;
+    lastRoomSnapshot = null;
+    await refreshPlayerKnowledge();
+
+    if (data.ended) {
+        renderGameOver(data);
+        return;
+    }
+
+    if (!data.started) {
+        renderWaitingRoom(data);
+        return;
+    }
+
+    if (data.reveal_phase_active) {
+        await renderRevealScreen(data);
+        return;
+    }
+
+    renderPlayScreen(data);
 }
 
 function buildRoomSnapshot(data) {
@@ -551,11 +675,21 @@ async function refreshRoomState() {
     if (!currentRoomCode) return;
 
     const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}`);
-    if (!response.ok) return;
+    if (!response.ok) {
+        if (response.status === 404) {
+            await handleWhoAmIRoomExit("تم حذف الغرفة أو لم تعد متاحة.");
+        }
+        return;
+    }
 
     const data = await response.json();
     currentRoomData = data;
     isHost = currentPlayerId === data.host_id;
+
+    if (!ensureCurrentWhoAmIPlayerStillInRoom(data)) {
+        return;
+    }
+
     await refreshPlayerKnowledge();
 
     const me = data.players.find((player) => player.id === currentPlayerId);
@@ -592,12 +726,23 @@ function renderWaitingRoom(data) {
     document.getElementById("displayCode").textContent = data.room_code;
 
     const playerList = document.getElementById("playerList");
+    const headerRow = playerList?.closest("table")?.querySelector("thead tr");
     playerList.innerHTML = "";
+    if (headerRow) {
+        let actionsHeader = document.getElementById("playerListActionsHeader");
+        if (!actionsHeader) {
+            actionsHeader = document.createElement("th");
+            actionsHeader.id = "playerListActionsHeader";
+            headerRow.appendChild(actionsHeader);
+        }
+        actionsHeader.textContent = isHost ? "\u0627\u0644\u0625\u062C\u0631\u0627\u0621" : "";
+    }
 
     data.players.forEach((player) => {
         const row = document.createElement("tr");
         row.innerHTML = `
             <td>${buildWhoAmIPlayerIdentity(player)}</td>
+            ${buildWhoAmIRemoveActionCell(player.id)}
         `;
         playerList.appendChild(row);
     });
@@ -629,9 +774,28 @@ async function renderRevealScreen(data) {
     });
 
     if (!response.ok) {
+        let errorDetail = "";
+        try {
+            const errorData = await response.json();
+            errorDetail = errorData.detail || "";
+        } catch (error) {
+            errorDetail = "";
+        }
+
+        if (errorDetail === "Player not found.") {
+            await handleWhoAmIRoomExit("تمت إزالتك من الغرفة.");
+            return;
+        }
+
+        if (errorDetail === "Room not found.") {
+            await handleWhoAmIRoomExit("تم حذف الغرفة أو لم تعد متاحة.");
+            return;
+        }
+
         status.textContent = "بانتظار تحديث حالة الكشف...";
         identityBox.textContent = "بانتظار الدور...";
         nextRevealBtn.classList.add("hidden");
+        renderRevealPlayersState(data);
         return;
     }
 
@@ -652,6 +816,7 @@ async function renderRevealScreen(data) {
     } else {
         nextRevealBtn.classList.add("hidden");
     }
+    renderRevealPlayersState(data);
     updateWhoAmIRoomActionButtons();
 }
 
@@ -774,6 +939,7 @@ function renderPlayersState(data) {
                 <td>${statusText}</td>
                 <td>${player.guess_count}</td>
                 <td>${identityText}</td>
+                ${buildWhoAmIRemoveActionCell(player.id)}
             </tr>
         `;
     }).join("");
@@ -788,6 +954,7 @@ function renderPlayersState(data) {
                         <th>الحالة</th>
                         <th>عدد المحاولات</th>
                         <th>الهوية</th>
+                        <th>${isHost ? "\u0627\u0644\u0625\u062C\u0631\u0627\u0621" : ""}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -840,6 +1007,7 @@ function renderRankingTable(data) {
             <td>${buildWhoAmIPlayerIdentity(player)}</td>
             <td>${player.guess_count}</td>
             <td>${player.solved_order ?? "-"}</td>
+            ${buildWhoAmIRemoveActionCell(player.id)}
         </tr>
     `).join("");
 
@@ -859,6 +1027,260 @@ function renderRankingTable(data) {
             </tbody>
         </table>
     `;
+
+    const headerRow = container.querySelector("thead tr");
+    if (headerRow) {
+        const actionHeader = document.createElement("th");
+        actionHeader.style.padding = "10px";
+        actionHeader.style.borderBottom = "1px solid #333";
+        actionHeader.textContent = isHost ? "\u0627\u0644\u0625\u062C\u0631\u0627\u0621" : "";
+        headerRow.appendChild(actionHeader);
+    }
+}
+
+async function toggleCategory(categoryKey) {
+    if (!isHost || currentRoomData?.started) {
+        return;
+    }
+
+    const isSelected = selectedCategories.includes(categoryKey);
+    let nextCategories;
+
+    if (isSelected) {
+        nextCategories = selectedCategories.filter((c) => c !== categoryKey);
+    } else {
+        if (selectedCategories.length >= MAX_CATEGORIES) {
+            showWhoAmIError(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
+            return;
+        }
+
+        nextCategories = [...selectedCategories, categoryKey];
+    }
+
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/categories`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            host_id: currentPlayerId,
+            categories: nextCategories
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "تعذر تحديث التصنيفات.");
+        return;
+    }
+
+    currentRoomData = data;
+    selectedCategories = [...(data.categories || [])];
+    isHost = currentPlayerId === data.host_id;
+    lastRoomSnapshot = null;
+    renderWaitingRoom(data);
+}
+
+function updateCategoryButtonsState() {
+    const buttons = document.querySelectorAll("#categoryGrid .category-btn");
+    const info = document.getElementById("categorySelectionInfo");
+    const canEdit = isHost && currentRoomData && !currentRoomData.started;
+
+    if (info) {
+        info.textContent = `تم اختيار ${selectedCategories.length} / ${MAX_CATEGORIES}`;
+    }
+
+    buttons.forEach((btn) => {
+        const key = btn.dataset.categoryKey;
+        if (!key) return;
+
+        const isSelected = selectedCategories.includes(key);
+        btn.classList.toggle("active", isSelected);
+
+        if (!canEdit) {
+            btn.classList.add("disabled");
+            btn.disabled = true;
+            return;
+        }
+
+        if (!isSelected && selectedCategories.length >= MAX_CATEGORIES) {
+            btn.classList.add("disabled");
+            btn.disabled = true;
+        } else {
+            btn.classList.remove("disabled");
+            btn.disabled = false;
+        }
+    });
+}
+
+function renderWhoAmIPregameCategories(data) {
+    const container = document.getElementById("categoryGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    allWhoAmICategories.forEach((key) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.categoryKey = key;
+        button.textContent = categoryLabels[key] || key;
+        button.onclick = () => toggleCategory(key);
+        container.appendChild(button);
+    });
+
+    const info = document.getElementById("categorySelectionInfo");
+    if (info && !isHost) {
+        info.textContent = data.categories?.length
+            ? `المنظم يختار التصنيفات الآن: ${data.categories.length} / ${MAX_CATEGORIES}`
+            : `المنظم لم يختر أي تصنيف بعد`;
+    }
+
+    updateCategoryButtonsState();
+}
+
+async function createRoom() {
+    const hostName = currentPlayerName || document.getElementById("pName").value.trim();
+    const playerCount = selectedPlayerCount;
+
+    if (!selectedPlayerCount) {
+        showWhoAmIError("اختر عدد اللاعبين أولاً!");
+        return;
+    }
+
+    const response = await fetch("/api/who-am-i/rooms", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            host_name: hostName,
+            max_player_count: playerCount,
+            categories: [],
+            character_id: selectedCharacter
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        return;
+    }
+
+    currentRoomCode = data.room_code;
+    currentPlayerId = data.host_id;
+    currentPlayerName = hostName;
+    currentRoomData = data;
+    isHost = true;
+    cachedIdentity = "";
+    currentGuessDraft = "";
+    selectedCategories = [...(data.categories || [])];
+    lastRoomSnapshot = null;
+
+    localStorage.setItem("whoami_room_code", currentRoomCode);
+    localStorage.setItem("whoami_player_id", currentPlayerId);
+    localStorage.setItem("whoami_player_name", currentPlayerName);
+    hideWhoAmIError();
+    renderWaitingRoom(data);
+}
+
+async function startGame() {
+    if (!currentRoomData?.categories?.length) {
+        showWhoAmIError("اختر تصنيفًا واحدًا على الأقل قبل بدء اللعبة.");
+        return;
+    }
+
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/start`, {
+        method: "POST"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "تعذر بدء اللعبة.");
+        return;
+    }
+
+    currentRoomData = data;
+    isHost = currentPlayerId === data.host_id;
+    cachedIdentity = "";
+    currentGuessDraft = "";
+    lastRoomSnapshot = null;
+
+    renderRevealScreen(data);
+}
+
+async function restartGame() {
+    const categories = selectedCategories.length > 0
+        ? selectedCategories
+        : currentRoomData?.categories || [];
+
+    if (categories.length === 0) {
+        showWhoAmIError("اختر تصنيفًا واحدًا على الأقل!");
+        return;
+    }
+
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/restart`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ categories })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "تعذر إعادة اللعبة.");
+        return;
+    }
+
+    currentRoomData = data;
+    cachedIdentity = "";
+    currentGuessDraft = "";
+    selectedCategories = [...(data.categories || [])];
+    lastRoomSnapshot = null;
+    renderWaitingRoom(data);
+}
+
+function renderWaitingRoom(data) {
+    hideAll();
+    document.getElementById("screen-wait").classList.remove("hidden");
+    currentRoomData = data;
+    selectedCategories = [...(data.categories || [])];
+
+    document.getElementById("displayCode").textContent = data.room_code;
+
+    const playerList = document.getElementById("playerList");
+    const headerRow = playerList?.closest("table")?.querySelector("thead tr");
+    playerList.innerHTML = "";
+    if (headerRow) {
+        let actionsHeader = document.getElementById("playerListActionsHeader");
+        if (!actionsHeader) {
+            actionsHeader = document.createElement("th");
+            actionsHeader.id = "playerListActionsHeader";
+            headerRow.appendChild(actionsHeader);
+        }
+        actionsHeader.textContent = isHost ? "الإجراء" : "";
+    }
+
+    data.players.forEach((player) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${buildWhoAmIPlayerIdentity(player)}</td>
+            ${buildWhoAmIRemoveActionCell(player.id)}
+        `;
+        playerList.appendChild(row);
+    });
+
+    renderWhoAmIPregameCategories(data);
+
+    if (isHost) {
+        document.getElementById("adminArea").classList.remove("hidden");
+        document.getElementById("memberArea").classList.add("hidden");
+        document.getElementById("waitMsg").classList.add("hidden");
+    } else {
+        document.getElementById("adminArea").classList.add("hidden");
+        document.getElementById("memberArea").classList.remove("hidden");
+        document.getElementById("waitMsg").classList.remove("hidden");
+    }
+    updateWhoAmIRoomActionButtons();
 }
 
 function clearLocalGameState() {

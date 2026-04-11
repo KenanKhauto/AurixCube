@@ -12,7 +12,7 @@ class BluffCreateRoomRequest(BaseModel):
     character_id: str = "char1"
     max_player_count: int = Field(..., ge=2, le=10)
     total_rounds: int = Field(..., ge=1, le=20)
-    categories: List[str]
+    categories: List[str] = Field(default_factory=list)
     round_timer_seconds: int = Field(30, ge=30, le=90)
 
 
@@ -49,6 +49,16 @@ class BluffLeaveRoomRequest(BaseModel):
     player_id: str
 
 
+class BluffRemovePlayerRequest(BaseModel):
+    host_id: str
+    player_id_to_remove: str
+
+
+class BluffUpdateCategoriesRequest(BaseModel):
+    host_id: str
+    categories: List[str] = Field(default_factory=list)
+
+
 class BluffDeleteRoomRequest(BaseModel):
     player_id: str
 
@@ -78,6 +88,7 @@ class BluffRoomStateResponse(BaseModel):
 
     started: bool
     ended: bool
+    end_reason: Optional[str] = None
     winner_ids: List[str]
 
     round_timer_seconds: int

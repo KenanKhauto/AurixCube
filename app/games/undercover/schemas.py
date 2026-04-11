@@ -10,7 +10,7 @@ class CreateRoomRequest(BaseModel):
     host_name: str = Field(..., min_length=1, max_length=50)
     max_player_count: int = Field(..., ge=3, le=20)
     undercover_count: int = Field(..., ge=1, le=4)
-    categories: list[str]
+    categories: list[str] = Field(default_factory=list, max_length=12)
 
 
 class JoinRoomRequest(BaseModel):
@@ -39,6 +39,20 @@ class RestartRoomRequest(BaseModel):
     undercover_count: int
 
 
+class RemovePlayerRequest(BaseModel):
+    """Request body for removing a player."""
+
+    host_id: str
+    player_id_to_remove: str
+
+
+class UpdateCategoriesRequest(BaseModel):
+    """Request body for updating waiting-room categories."""
+
+    host_id: str
+    categories: list[str] = Field(default_factory=list, max_length=12)
+
+
 class PlayerView(BaseModel):
     """Serializable player representation for API responses."""
 
@@ -58,6 +72,7 @@ class RoomStateResponse(BaseModel):
     undercover_count: int
     started: bool
     ended: bool
+    end_reason: Optional[str] = None
     winner: Optional[str]
     players: List[PlayerView]
     votes: Dict[str, List[str]]

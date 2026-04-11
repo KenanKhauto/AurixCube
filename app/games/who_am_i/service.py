@@ -37,15 +37,7 @@ class WhoAmIService:
         """
         Create a new room and add the host as the first player.
         """
-        if not categories:
-            raise ValueError("At least one category must be selected.")
-
-        if len(categories) > 12:
-            raise ValueError("You can select up to 12 categories only.")
-
-        invalid_categories = [category for category in categories if category not in CATEGORIES]
-        if invalid_categories:
-            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
+        categories = self._validate_categories(categories, allow_empty=True)
 
         room_code = generate_room_code()
         host_id = str(uuid.uuid4())
@@ -100,15 +92,49 @@ class WhoAmIService:
         if player_id == room.host_id:
             raise ValueError("Hosts cannot leave. Use delete-room instead.")
 
-        del room.players[player_id]
+        self._remove_player_from_room(room, player_id)
 
         if not room.players:
             self.room_repository.delete_room(room_code)
             return None
 
-        # Check for insufficient players after someone leaves
-        if room.started and not self._has_sufficient_players(room):
-            self._end_game_insufficient_players(room)
+        self._finalize_room_after_player_removal(room)
+
+        self.room_repository.save_room(room_code, self._serialize_room(room))
+        return room
+
+    def update_categories(self, room_code: str, host_id: str, categories: list[str]) -> WhoAmIRoom:
+        room = self._get_room(room_code)
+
+        if host_id != room.host_id:
+            raise ValueError("Only the host can update categories.")
+
+        if room.started:
+            raise ValueError("Categories can only be updated before the game starts.")
+
+        room.categories = self._validate_categories(categories, allow_empty=True)
+        self.room_repository.save_room(room_code, self._serialize_room(room))
+        return room
+
+    def remove_player(self, room_code: str, host_id: str, player_id_to_remove: str) -> WhoAmIRoom:
+        room = self._get_room(room_code)
+
+        if host_id != room.host_id:
+            raise ValueError("Only the host can remove players.")
+
+        if player_id_to_remove not in room.players:
+            raise PlayerNotFoundError("Player not found.")
+
+        if player_id_to_remove == room.host_id:
+            raise ValueError("Host cannot remove themselves.")
+
+        self._remove_player_from_room(room, player_id_to_remove)
+
+        if not room.players:
+            self.room_repository.delete_room(room_code)
+            return room
+
+        self._finalize_room_after_player_removal(room)
 
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
@@ -132,6 +158,7 @@ class WhoAmIService:
         room.end_reason = "host_deleted"
         self.room_repository.save_room(room_code, self._serialize_room(room))
         self.room_repository.delete_room(room_code)
+
     def _cleanup_inactive_players(self, room: WhoAmIRoom) -> None:
         now = datetime.now()
         inactive_player_ids = [
@@ -139,11 +166,13 @@ class WhoAmIService:
             if (now - player.last_seen).total_seconds() > 60  # 1 minute
         ]
         for pid in inactive_player_ids:
-            del room.players[pid]
+            if pid in room.players:
+                self._remove_player_from_room(room, pid)
         if inactive_player_ids and not room.players:
             self.room_repository.delete_room(room.room_code)
-        elif inactive_player_ids and room.started and not self._has_sufficient_players(room):
-            self._end_game_insufficient_players(room)
+        elif inactive_player_ids:
+            self._finalize_room_after_player_removal(room)
+
     def start_game(self, room_code: str) -> WhoAmIRoom:
         """
         Start the game by assigning identities and entering the controlled reveal phase.
@@ -153,6 +182,9 @@ class WhoAmIService:
 
         if len(room.players) < 2:
             raise ValueError("At least 2 players are required to start the game.")
+
+        if not room.categories:
+            raise ValueError("At least one category must be selected.")
 
         identities_pool = []
         for category in room.categories:
@@ -176,6 +208,7 @@ class WhoAmIService:
 
         room.started = True
         room.ended = False
+        room.end_reason = None
 
         room.reveal_phase_active = True
         room.reveal_order = reveal_order
@@ -323,6 +356,7 @@ class WhoAmIService:
 
             if not room.active_turn_order:
                 room.ended = True
+                room.end_reason = "game_completed"
                 room.current_turn_player_id = None
         else:
             self._advance_turn(room)
@@ -335,20 +369,12 @@ class WhoAmIService:
         Restart the room with the same players and a new category.
         """
         room = self._get_room(room_code)
-        categories = list(dict.fromkeys(categories))
-        if not categories:
-            raise ValueError("At least one category must be selected.")
-
-        if len(categories) > 12:
-            raise ValueError("You can select up to 12 categories only.")
-
-        invalid_categories = [category for category in categories if category not in CATEGORIES]
-        if invalid_categories:
-            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
+        categories = self._validate_categories(categories)
 
         room.categories = categories
         room.started = False
         room.ended = False
+        room.end_reason = None
 
         room.reveal_phase_active = False
         room.reveal_order = []
@@ -370,12 +396,29 @@ class WhoAmIService:
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
+    def _validate_categories(self, categories: list[str], allow_empty: bool = False) -> list[str]:
+        categories = list(dict.fromkeys(categories))
+
+        if not categories and not allow_empty:
+            raise ValueError("At least one category must be selected.")
+
+        if len(categories) > 12:
+            raise ValueError("You can select up to 12 categories only.")
+
+        invalid_categories = [category for category in categories if category not in CATEGORIES]
+        if invalid_categories:
+            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
+
+        return categories
+
     def get_room_state(self, room_code: str) -> WhoAmIRoom:
         """
         Retrieve current room state.
         """
         room = self._get_room(room_code)
         self._cleanup_inactive_players(room)
+        if room.players:
+            self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
     def _advance_turn(self, room: WhoAmIRoom, solved_player_id: str | None = None) -> None:
@@ -425,6 +468,65 @@ class WhoAmIService:
 
         room.current_turn_player_id = room.active_turn_order[next_index]
 
+    def _remove_player_from_room(self, room: WhoAmIRoom, player_id: str) -> None:
+        reveal_index = room.reveal_order.index(player_id) if player_id in room.reveal_order else None
+        turn_index = room.active_turn_order.index(player_id) if player_id in room.active_turn_order else None
+
+        del room.players[player_id]
+
+        room.reveal_order = [pid for pid in room.reveal_order if pid != player_id]
+        room.full_turn_order = [pid for pid in room.full_turn_order if pid != player_id]
+        room.active_turn_order = [pid for pid in room.active_turn_order if pid != player_id]
+
+        if room.current_reveal_player_id == player_id:
+            if room.reveal_order:
+                next_index = reveal_index if reveal_index is not None else 0
+                if next_index >= len(room.reveal_order):
+                    next_index = len(room.reveal_order) - 1
+                room.current_reveal_player_id = room.reveal_order[next_index]
+            else:
+                room.current_reveal_player_id = None
+
+        if room.current_turn_player_id == player_id:
+            if room.active_turn_order:
+                next_index = turn_index if turn_index is not None else 0
+                if next_index >= len(room.active_turn_order):
+                    next_index = 0
+                    room.turn_number += 1
+                room.current_turn_player_id = room.active_turn_order[next_index]
+            else:
+                room.current_turn_player_id = None
+
+    def _finalize_room_after_player_removal(self, room: WhoAmIRoom) -> None:
+        if room.started and not self._has_sufficient_players(room):
+            self._end_game_insufficient_players(room)
+            return
+
+        if not room.started:
+            return
+
+        if room.reveal_phase_active:
+            room.reveal_order = [pid for pid in room.reveal_order if pid in room.players]
+            if room.current_reveal_player_id not in room.players:
+                room.current_reveal_player_id = room.reveal_order[0] if room.reveal_order else None
+
+            if not room.reveal_order:
+                room.reveal_phase_active = False
+                room.current_reveal_player_id = None
+                room.current_turn_player_id = room.active_turn_order[0] if room.active_turn_order else None
+            return
+
+        room.active_turn_order = [pid for pid in room.active_turn_order if pid in room.players]
+        room.full_turn_order = [pid for pid in room.full_turn_order if pid in room.players]
+
+        if room.current_turn_player_id not in room.players:
+            room.current_turn_player_id = room.active_turn_order[0] if room.active_turn_order else None
+
+        if not room.active_turn_order and room.started:
+            room.ended = True
+            room.end_reason = "game_completed"
+            room.current_turn_player_id = None
+
     def _has_sufficient_players(self, room: WhoAmIRoom) -> bool:
         """Check if the game can continue with the current number of players."""
         return len(room.players) >= 2
@@ -454,6 +556,7 @@ class WhoAmIService:
             "max_player_count": room.max_player_count,
             "started": room.started,
             "ended": room.ended,
+            "end_reason": room.end_reason,
             "reveal_phase_active": room.reveal_phase_active,
             "reveal_order": room.reveal_order,
             "current_reveal_player_id": room.current_reveal_player_id,
@@ -487,6 +590,7 @@ class WhoAmIService:
             max_player_count=data["max_player_count"],
             started=data["started"],
             ended=data["ended"],
+            end_reason=data.get("end_reason"),
             reveal_phase_active=data.get("reveal_phase_active", False),
             reveal_order=data.get("reveal_order", []),
             current_reveal_player_id=data.get("current_reveal_player_id"),
@@ -542,6 +646,7 @@ class WhoAmIService:
                 "has_guessed_correctly": player.has_guessed_correctly,
                 "solved_order": player.solved_order,
                 "visible_identity": visible_identity,
+                "character_id": player.character_id,
             })
 
         return visible_players

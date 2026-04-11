@@ -35,10 +35,6 @@
         <label>مدة الجولة:</label>
         <div id="bluffTimerGrid" class="category-grid"></div>
 
-        <label>التصنيفات:</label>
-        <div id="bluffCategorySelectionInfo" style="color:#aaa; margin-bottom:10px;">تم اختيار 0 / 12</div>
-        <div id="bluffCategoryGrid" class="category-grid"></div>
-
         <button class="btn btn-primary" onclick="createBluffRoom()">تأكيد الإعدادات</button>
         <button class="btn" onclick="goBackToBluffLobby()">رجوع</button>
     </div>
@@ -46,6 +42,9 @@
     <div id="screen-bluff-wait" class="card hidden">
         <div id="bluff-wait-error" class="error-box hidden"></div>
         <h3>كود الغرفة: <span id="bluffDisplayCode" style="color:var(--primary)"></span></h3>
+        <div class="phase-info" id="bluffPregameInfo"></div>
+
+
 
         <div class="table-wrapper">
             <table class="bluff-table bluff-players-table">
@@ -53,11 +52,16 @@
                     <tr>
                         <th>اللاعب</th>
                         <th>النقاط</th>
+                        <th id="bluffActionsHeader" style="display: none;">الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody id="bluffPlayerList"></tbody>
             </table>
         </div>
+
+        <h3>اختيار التصنيفات</h3>
+        <div id="bluffCategorySelectionInfo" style="color:#aaa; margin-bottom:10px;">تم اختيار 0 / 12</div>
+        <div id="bluffCategoryGrid" class="category-grid" style="margin-bottom:20px;"></div>
 
         <div id="bluffHostArea" class="hidden">
             <button class="btn btn-primary" onclick="startBluffGame()">ابدأ اللعبة الآن</button>
@@ -98,6 +102,7 @@
                         <tr>
                             <th>اللاعب</th>
                             <th>النقاط</th>
+                            <th>الإجراءات</th>
                         </tr>
                     </thead>
                     <tbody id="bluffScoreboardCategoryPick"></tbody>
@@ -143,6 +148,7 @@
                         <tr>
                             <th>اللاعب</th>
                             <th>النقاط</th>
+                            <th>الإجراءات</th>
                         </tr>
                     </thead>
                     <tbody id="bluffScoreboardSubmission"></tbody>
@@ -188,6 +194,7 @@
                         <tr>
                             <th>اللاعب</th>
                             <th>النقاط</th>
+                            <th>الإجراءات</th>
                         </tr>
                     </thead>
                     <tbody id="bluffScoreboardAnswerPick"></tbody>
@@ -229,6 +236,7 @@
                         <th>اللاعب</th>
                         <th>النقاط</th>
                         <th>زيادة هذه الجولة</th>
+                        <th>الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody id="bluffRankingTableBody"></tbody>
@@ -255,6 +263,7 @@
                         <th>الترتيب</th>
                         <th>اللاعب</th>
                         <th>النقاط</th>
+                        <th>الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody id="bluffScoreboardFinal"></tbody>

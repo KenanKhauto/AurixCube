@@ -92,6 +92,20 @@
     </div>
 </footer>
 
+<div id="appModalOverlay" class="app-modal-overlay hidden" aria-hidden="true">
+    <div class="app-modal" role="dialog" aria-modal="true" aria-labelledby="appModalTitle" aria-describedby="appModalMessage">
+        <div class="app-modal-glow"></div>
+        <div class="app-modal-content">
+            <div class="app-modal-badge">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <h3 id="appModalTitle" class="app-modal-title"></h3>
+            <p id="appModalMessage" class="app-modal-message"></p>
+            <div id="appModalActions" class="app-modal-actions"></div>
+        </div>
+    </div>
+</div>
+
 <script>
 function toggleMenu() {
     document.getElementById("mobileMenu").classList.toggle("hidden");
@@ -144,6 +158,104 @@ function setupNavIndicator() {
 }
 
 document.addEventListener("DOMContentLoaded", setupNavIndicator);
+
+let activeAppDialog = null;
+
+function closeAppDialog(result) {
+    if (!activeAppDialog) return;
+
+    const { overlay, resolver, keyHandler } = activeAppDialog;
+    document.removeEventListener("keydown", keyHandler);
+    overlay.classList.add("hidden");
+    overlay.setAttribute("aria-hidden", "true");
+    activeAppDialog = null;
+    resolver(result);
+}
+
+function openAppDialog(options) {
+    const overlay = document.getElementById("appModalOverlay");
+    const titleEl = document.getElementById("appModalTitle");
+    const messageEl = document.getElementById("appModalMessage");
+    const actionsEl = document.getElementById("appModalActions");
+
+    if (!overlay || !titleEl || !messageEl || !actionsEl) {
+        return Promise.resolve(false);
+    }
+
+    if (activeAppDialog) {
+        closeAppDialog(false);
+    }
+
+    const {
+        title = "تنبيه",
+        message = "",
+        confirmLabel = "موافق",
+        cancelLabel = "إلغاء",
+        showCancel = false,
+        danger = false,
+    } = options || {};
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    actionsEl.innerHTML = "";
+
+    const confirmButton = document.createElement("button");
+    confirmButton.type = "button";
+    confirmButton.className = `btn ${danger ? "" : "btn-primary"} app-modal-action`;
+    confirmButton.textContent = confirmLabel;
+    confirmButton.onclick = () => closeAppDialog(true);
+
+    if (showCancel) {
+        const cancelButton = document.createElement("button");
+        cancelButton.type = "button";
+        cancelButton.className = "btn app-modal-action";
+        cancelButton.textContent = cancelLabel;
+        cancelButton.onclick = () => closeAppDialog(false);
+        actionsEl.appendChild(cancelButton);
+    }
+
+    actionsEl.appendChild(confirmButton);
+
+    overlay.classList.remove("hidden");
+    overlay.setAttribute("aria-hidden", "false");
+
+    const keyHandler = (event) => {
+        if (event.key === "Escape") {
+            closeAppDialog(showCancel ? false : true);
+        }
+    };
+
+    document.addEventListener("keydown", keyHandler);
+
+    return new Promise((resolve) => {
+        activeAppDialog = {
+            overlay,
+            resolver: resolve,
+            keyHandler,
+        };
+    });
+}
+
+function openAppAlert(message, options = {}) {
+    return openAppDialog({
+        title: options.title || "تنبيه",
+        message,
+        confirmLabel: options.confirmLabel || "حسناً",
+        showCancel: false,
+        danger: options.danger || false,
+    });
+}
+
+function openAppConfirm(message, options = {}) {
+    return openAppDialog({
+        title: options.title || "تأكيد",
+        message,
+        confirmLabel: options.confirmLabel || "تأكيد",
+        cancelLabel: options.cancelLabel || "إلغاء",
+        showCancel: true,
+        danger: options.danger !== false,
+    });
+}
 </script>
 
 </body>

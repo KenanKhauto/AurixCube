@@ -36,7 +36,7 @@ class DrawGuessGameService:
         language: str,
         round_timer_seconds: int,
     ) -> DrawGuessRoom:
-        categories = self._validate_categories(categories)
+        categories = self._validate_categories(categories, allow_empty=True)
         self._validate_language(language)
         self._validate_timer(round_timer_seconds)
 
@@ -99,19 +99,51 @@ class DrawGuessGameService:
         if player_id == room.host_id:
             raise ValueError("Hosts cannot leave. Use delete-room instead.")
 
-        del room.players[player_id]
-        room.scores.pop(player_id, None)
+        self._remove_player_from_room(room, player_id)
 
         if not room.players:
             self.room_repository.delete_room(room_code)
             return None
 
-        # Check for insufficient players after someone leaves
-        if room.started and not self._has_sufficient_players(room):
-            self._end_game_insufficient_players(room)
-
+        self._finalize_room_after_player_removal(room)
         self._save_room(room)
         return room
+
+    def update_categories(self, room_code: str, host_id: str, categories: List[str]) -> DrawGuessRoom:
+        room = self._get_room(room_code)
+
+        if host_id != room.host_id:
+            raise ValueError("Only the host can update categories.")
+
+        if room.started:
+            raise ValueError("Categories can only be updated before the game starts.")
+
+        room.categories = self._validate_categories(categories, allow_empty=True)
+        self._save_room(room)
+        return room
+
+    def remove_player(self, room_code: str, host_id: str, player_id_to_remove: str) -> DrawGuessRoom:
+        room = self._get_room(room_code)
+
+        if host_id != room.host_id:
+            raise ValueError("Only the host can remove players.")
+
+        if player_id_to_remove not in room.players:
+            raise PlayerNotFoundError("Player not found.")
+
+        if player_id_to_remove == room.host_id:
+            raise ValueError("Host cannot remove themselves.")
+
+        self._remove_player_from_room(room, player_id_to_remove)
+
+        if not room.players:
+            self.room_repository.delete_room(room_code)
+            return room
+
+        self._finalize_room_after_player_removal(room)
+        self._save_room(room)
+        return room
+
     def _cleanup_inactive_players(self, room: DrawGuessRoom) -> None:
         now = datetime.now()
         inactive_player_ids = [
@@ -149,8 +181,12 @@ class DrawGuessGameService:
         if len(room.players) < 2:
             raise ValueError("At least 2 players are required to start the game.")
 
+        if not room.categories:
+            raise ValueError("At least one category must be selected.")
+
         room.started = True
         room.ended = False
+        room.end_reason = None
         room.winner_ids = []
         room.current_round = 1
         room.drawer_order = list(room.players.keys())
@@ -293,6 +329,7 @@ class DrawGuessGameService:
 
         room.started = False
         room.ended = False
+        room.end_reason = None
         room.winner_ids = []
         room.current_round = 1
         room.phase = "waiting"
@@ -362,6 +399,7 @@ class DrawGuessGameService:
 
     def _finish_game(self, room: DrawGuessRoom) -> None:
         room.ended = True
+        room.end_reason = "game_completed"
         room.phase = "game_over"
         room.phase_deadline_at = None
 
@@ -375,6 +413,52 @@ class DrawGuessGameService:
             for player_id, score in room.scores.items()
             if score == max_score
         ]
+
+    def _remove_player_from_room(self, room: DrawGuessRoom, player_id: str) -> None:
+        del room.players[player_id]
+        room.scores.pop(player_id, None)
+        room.drawer_order = [pid for pid in room.drawer_order if pid != player_id]
+        room.guessed_correctly_player_ids = [
+            pid for pid in room.guessed_correctly_player_ids if pid != player_id
+        ]
+        room.guesses = [guess for guess in room.guesses if guess.player_id != player_id]
+        room.last_round_score_changes.pop(player_id, None)
+        room.winner_ids = [pid for pid in room.winner_ids if pid != player_id]
+
+        if room.current_drawer_id == player_id:
+            room.current_drawer_id = None
+
+    def _finalize_room_after_player_removal(self, room: DrawGuessRoom) -> None:
+        if room.started and not self._has_sufficient_players(room):
+            self._end_game_insufficient_players(room)
+            return
+
+        if not room.started:
+            return
+
+        if room.phase in {"word_choice", "drawing"} and room.current_drawer_id not in room.players:
+            if room.drawer_order:
+                self._start_word_choice_phase(room)
+            else:
+                self._end_game_insufficient_players(room)
+            return
+
+        if room.phase == "drawing":
+            remaining_guessers = [
+                pid for pid in room.players.keys()
+                if pid != room.current_drawer_id
+            ]
+            room.guessed_correctly_player_ids = [
+                pid for pid in room.guessed_correctly_player_ids
+                if pid in remaining_guessers
+            ]
+
+            if room.current_drawer_id and len(room.guessed_correctly_player_ids) >= len(remaining_guessers):
+                self._resolve_round(room)
+                return
+
+        if room.phase == "game_over" and room.end_reason != "insufficient_players":
+            self._finish_game(room)
 
     def _has_sufficient_players(self, room: DrawGuessRoom) -> bool:
         """Check if the game can continue with the current number of players."""
@@ -432,10 +516,10 @@ class DrawGuessGameService:
     def _normalize_text(self, text: str) -> str:
         return " ".join(text.strip().lower().split())
 
-    def _validate_categories(self, categories: List[str]) -> List[str]:
+    def _validate_categories(self, categories: List[str], allow_empty: bool = False) -> List[str]:
         categories = list(dict.fromkeys(categories))
 
-        if not categories:
+        if not categories and not allow_empty:
             raise ValueError("At least one category must be selected.")
 
         invalid = [category for category in categories if category not in DRAW_CATEGORIES]
@@ -472,6 +556,7 @@ class DrawGuessGameService:
             "round_timer_seconds": room.round_timer_seconds,
             "started": room.started,
             "ended": room.ended,
+            "end_reason": room.end_reason,
             "winner_ids": room.winner_ids,
             "current_round": room.current_round,
             "phase": room.phase,
@@ -546,6 +631,7 @@ class DrawGuessGameService:
             round_timer_seconds=data.get("round_timer_seconds", 60),
             started=data.get("started", False),
             ended=data.get("ended", False),
+            end_reason=data.get("end_reason"),
             winner_ids=data.get("winner_ids", []),
             current_round=data.get("current_round", 1),
             phase=data.get("phase", "waiting"),

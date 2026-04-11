@@ -40,17 +40,7 @@ class UndercoverGameService:
         """
         Create a new room and add the host as the first player.
         """
-        categories = list(dict.fromkeys(categories))
-
-        if not categories:
-            raise ValueError("At least one category must be selected.")
-
-        if len(categories) > 12:
-            raise ValueError("You can select up to 12 categories only.")
-
-        invalid_categories = [category for category in categories if category not in CATEGORIES]
-        if invalid_categories:
-            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
+        categories = self._validate_categories(categories, allow_empty=True)
 
         room_code = generate_room_code()
         host_id = str(uuid.uuid4())
@@ -105,16 +95,48 @@ class UndercoverGameService:
         if player_id == room.host_id:
             raise ValueError("Hosts cannot leave. Use delete-room instead.")
 
-        del room.players[player_id]
+        self._remove_player_from_room(room, player_id)
 
         if not room.players:
             self.room_repository.delete_room(room_code)
             return None
 
-        # Check for insufficient players after someone leaves
-        if room.started and not self._has_sufficient_players(room):
-            self._end_game_insufficient_players(room)
+        self._finalize_room_after_player_removal(room)
+        self.room_repository.save_room(room_code, self._serialize_room(room))
+        return room
 
+    def update_categories(self, room_code: str, host_id: str, categories: list[str]) -> UndercoverRoom:
+        room = self._get_room(room_code)
+
+        if host_id != room.host_id:
+            raise ValueError("Only the host can update categories.")
+
+        if room.started:
+            raise ValueError("Categories can only be updated before the game starts.")
+
+        room.categories = self._validate_categories(categories, allow_empty=True)
+        self.room_repository.save_room(room_code, self._serialize_room(room))
+        return room
+
+    def remove_player(self, room_code: str, host_id: str, player_id_to_remove: str) -> UndercoverRoom:
+        room = self._get_room(room_code)
+
+        if host_id != room.host_id:
+            raise ValueError("Only the host can remove players.")
+
+        if player_id_to_remove not in room.players:
+            raise PlayerNotFoundError("Player not found.")
+
+        if player_id_to_remove == room.host_id:
+            raise ValueError("Host cannot remove themselves.")
+
+        self._remove_player_from_room(room, player_id_to_remove)
+
+        if not room.players:
+            self.room_repository.delete_room(room_code)
+            return room
+
+        self._finalize_room_after_player_removal(room)
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
@@ -161,6 +183,9 @@ class UndercoverGameService:
         if len(room.players) < 3:
             raise ValueError("At least 3 players are required to start the game.")
 
+        if not room.categories:
+            raise ValueError("At least one category must be selected.")
+
         words = []
         for category in room.categories:
             words.extend(CATEGORIES[category])
@@ -184,6 +209,7 @@ class UndercoverGameService:
         room.started = True
         room.votes = {player_id: [] for player_id in room.players.keys()}
         room.ended = False
+        room.end_reason = None
         room.winner = None
         room.eliminated_player_id = None
         room.eliminated_player_is_undercover = None
@@ -267,17 +293,7 @@ class UndercoverGameService:
         """
         room = self._get_room(room_code)
 
-        categories = list(dict.fromkeys(categories))
-
-        if not categories:
-            raise ValueError("At least one category must be selected.")
-
-        if len(categories) > 12:
-            raise ValueError("You can select up to 12 categories only.")
-
-        invalid_categories = [category for category in categories if category not in CATEGORIES]
-        if invalid_categories:
-            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
+        categories = self._validate_categories(categories)
 
         room.categories = categories
         room.undercover_count = undercover_count
@@ -289,6 +305,7 @@ class UndercoverGameService:
 
         room.started = False
         room.ended = False
+        room.end_reason = None
         room.winner = None
         room.votes = {}
         room.eliminated_player_id = None
@@ -300,6 +317,21 @@ class UndercoverGameService:
 
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
+
+    def _validate_categories(self, categories: list[str], allow_empty: bool = False) -> list[str]:
+        categories = list(dict.fromkeys(categories))
+
+        if not categories and not allow_empty:
+            raise ValueError("At least one category must be selected.")
+
+        if len(categories) > 12:
+            raise ValueError("You can select up to 12 categories only.")
+
+        invalid_categories = [category for category in categories if category not in CATEGORIES]
+        if invalid_categories:
+            raise ValueError(f"Invalid categories: {', '.join(invalid_categories)}")
+
+        return categories
 
     def _assign_round_pair(self, room: UndercoverRoom) -> None:
         """
@@ -392,6 +424,7 @@ class UndercoverGameService:
 
         if not alive_undercovers:
             room.ended = True
+            room.end_reason = "game_completed"
             room.winner = "players"
             room.current_asker_id = None
             room.current_target_id = None
@@ -400,6 +433,7 @@ class UndercoverGameService:
 
         if len(alive_undercovers) >= len(alive_innocents):
             room.ended = True
+            room.end_reason = "game_completed"
             room.winner = "undercover"
             room.current_asker_id = None
             room.current_target_id = None
@@ -414,6 +448,83 @@ class UndercoverGameService:
         room.round_number += 1
         self._assign_round_pair(room)
 
+    def _remove_player_from_room(self, room: UndercoverRoom, player_id: str) -> None:
+        del room.players[player_id]
+
+        if room.eliminated_player_id == player_id:
+            room.eliminated_player_id = None
+            room.eliminated_player_is_undercover = None
+
+        if room.current_asker_id == player_id:
+            room.current_asker_id = None
+        if room.current_target_id == player_id:
+            room.current_target_id = None
+
+        sanitized_votes: Dict[str, List[str]] = {}
+        for voter_id, targets in room.votes.items():
+            if voter_id == player_id or voter_id not in room.players:
+                continue
+
+            if room.players[voter_id].is_eliminated:
+                continue
+
+            sanitized_votes[voter_id] = [
+                target_id
+                for target_id in targets
+                if target_id != player_id
+                and target_id in room.players
+                and not room.players[target_id].is_eliminated
+                and target_id != voter_id
+            ]
+
+        room.votes = sanitized_votes
+
+    def _finalize_room_after_player_removal(self, room: UndercoverRoom) -> None:
+        if not room.started:
+            return
+
+        active_players = [player for player in room.players.values() if not player.is_eliminated]
+        if len(active_players) < 2:
+            self._end_game_insufficient_players(room)
+            return
+
+        alive_undercovers = [player for player in active_players if player.is_undercover]
+        alive_innocents = [player for player in active_players if not player.is_undercover]
+
+        if not alive_undercovers:
+            room.ended = True
+            room.end_reason = "game_completed"
+            room.winner = "players"
+            room.current_asker_id = None
+            room.current_target_id = None
+            room.votes = {}
+            return
+
+        if len(alive_undercovers) >= len(alive_innocents):
+            room.ended = True
+            room.end_reason = "game_completed"
+            room.winner = "undercover"
+            room.current_asker_id = None
+            room.current_target_id = None
+            room.votes = {}
+            return
+
+        if room.ended:
+            room.current_asker_id = None
+            room.current_target_id = None
+            room.votes = {}
+            return
+
+        active_player_ids = {player.id for player in active_players}
+        if (
+            room.current_asker_id not in active_player_ids
+            or room.current_target_id not in active_player_ids
+            or room.current_asker_id == room.current_target_id
+        ):
+            self._assign_round_pair(room)
+
+        self._resolve_votes(room)
+
     def _has_sufficient_players(self, room: UndercoverRoom) -> bool:
         """Check if the game can continue with the current number of players."""
         return len(room.players) >= 2
@@ -422,6 +533,10 @@ class UndercoverGameService:
         """End the game due to insufficient players."""
         room.ended = True
         room.end_reason = "insufficient_players"
+        room.winner = None
+        room.current_asker_id = None
+        room.current_target_id = None
+        room.votes = {}
 
     def _get_room(self, room_code: str) -> UndercoverRoom:
         """
@@ -442,6 +557,7 @@ class UndercoverGameService:
             "undercover_count": room.undercover_count,
             "started": room.started,
             "ended": room.ended,
+            "end_reason": room.end_reason,
             "winner": room.winner,
             "votes": room.votes,
             "eliminated_player_id": room.eliminated_player_id,
@@ -472,6 +588,7 @@ class UndercoverGameService:
             undercover_count=data["undercover_count"],
             started=data["started"],
             ended=data["ended"],
+            end_reason=data.get("end_reason"),
             winner=data["winner"],
             votes=data["votes"],
             eliminated_player_id=data.get("eliminated_player_id"),

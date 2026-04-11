@@ -23,6 +23,7 @@ let lastRenderedBluffSignature = null;
 let selectedBluffPlayerCount = null;
 let selectedBluffRounds = null;
 let selectedBluffCategories = [];
+let allBluffCategories = [];
 const MAX_CATEGORIES = 12;
 let selectedBluffRoundTimer = 30;
 const bluffRoundTimerOptions = [
@@ -44,6 +45,32 @@ function showBluffError(message) {
 function hideBluffError() {
     const errorDiv = document.getElementById('bluff-global-error');
     errorDiv.classList.add('hidden');
+}
+
+async function handleBluffRoomExit(message) {
+    clearBluffLocalState();
+    await openAppAlert(message, {
+        title: "تمت إزالتك",
+        confirmLabel: "الخروج",
+        danger: true,
+    });
+    window.location.reload();
+}
+
+function ensureCurrentBluffPlayerStillInRoom(data) {
+    if ((data.players || []).some((player) => player.id === currentBluffPlayerId)) {
+        return true;
+    }
+
+    handleBluffRoomExit("تمت إزالتك من الغرفة.");
+    return false;
+}
+
+function buildBluffRemoveActionCell(playerId, showActions = true) {
+    if (showActions && bluffIsHost && playerId !== currentBluffPlayerId) {
+        return `<td><button class="btn btn-danger" onclick="removeBluffPlayer('${playerId}')">حذف</button></td>`;
+    }
+    return "<td></td>";
 }
 
 const bluffPlayerCountOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -198,23 +225,7 @@ function getBluffPlayerStatusText(player, data, mode) {
 async function loadBluffCategories() {
     const response = await fetch("/api/bluff/categories");
     const data = await response.json();
-
-    const container = document.getElementById("bluffCategoryGrid");
-    if (!container) return;
-
-    container.innerHTML = "";
-
-    (data.categories || []).forEach((key) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "category-btn";
-        button.dataset.categoryKey = key;
-        button.textContent = bluffCategoryLabels[key] || key;
-        button.onclick = () => toggleBluffCategory(key);
-        container.appendChild(button);
-    });
-
-    updateBluffCategoryButtonsState();
+    allBluffCategories = data.categories || [];
 }
 
 function renderBluffPlayerCountButtons() {
@@ -344,6 +355,89 @@ function updateBluffCategoryButtonsState() {
     });
 }
 
+async function toggleBluffCategory(categoryKey) {
+    if (!bluffIsHost || currentBluffRoomData?.started) return;
+
+    const isSelected = selectedBluffCategories.includes(categoryKey);
+    let nextCategories;
+
+    if (isSelected) {
+        nextCategories = selectedBluffCategories.filter((c) => c !== categoryKey);
+    } else {
+        if (selectedBluffCategories.length >= MAX_CATEGORIES) {
+            showBluffError(`\u064a\u0645\u0643\u0646\u0643 \u0627\u062e\u062a\u064a\u0627\u0631 ${MAX_CATEGORIES} \u062a\u0635\u0646\u064a\u0641\u0627\u062a \u0643\u062d\u062f \u0623\u0642\u0635\u0649`);
+            return;
+        }
+        nextCategories = [...selectedBluffCategories, categoryKey];
+    }
+
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/categories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            host_id: currentBluffPlayerId,
+            categories: nextCategories
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showBluffError(data.detail || "\u062a\u0639\u0630\u0631 \u062a\u062d\u062f\u064a\u062b \u0627\u0644\u062a\u0635\u0646\u064a\u0641\u0627\u062a.");
+        return;
+    }
+
+    currentBluffRoomData = data;
+    bluffIsHost = currentBluffPlayerId === data.host_id;
+    lastRenderedBluffSignature = null;
+    renderBluffWaitingRoom(data);
+}
+
+function renderBluffPregameCategories(data) {
+    const info = document.getElementById("bluffCategorySelectionInfo");
+    if (info) {
+        info.textContent = `\u062a\u0645 \u0627\u062e\u062a\u064a\u0627\u0631 ${selectedBluffCategories.length} / ${MAX_CATEGORIES}`;
+    }
+
+    const pregameInfo = document.getElementById("bluffPregameInfo");
+    if (pregameInfo) {
+        if (bluffIsHost) {
+            pregameInfo.textContent = "\u0627\u062e\u062a\u0631 \u0627\u0644\u062a\u0635\u0646\u064a\u0641\u0627\u062a \u0627\u0644\u0645\u0633\u0645\u0648\u062d\u0629 \u0642\u0628\u0644 \u0628\u062f\u0621 \u0627\u0644\u0644\u0639\u0628\u0629.";
+        } else {
+            const host = data.players.find((player) => player.id === data.host_id);
+            pregameInfo.textContent = host
+                ? `${host.name} \u064a\u062e\u062a\u0627\u0631 \u0627\u0644\u062a\u0635\u0646\u064a\u0641\u0627\u062a \u0627\u0644\u0622\u0646`
+                : "\u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u062e\u062a\u064a\u0627\u0631 \u0627\u0644\u062a\u0635\u0646\u064a\u0641\u0627\u062a";
+        }
+    }
+
+    const container = document.getElementById("bluffCategoryGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    allBluffCategories.forEach((key) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.categoryKey = key;
+        button.textContent = bluffCategoryLabels[key] || key;
+
+        const isSelected = selectedBluffCategories.includes(key);
+        const disableBecauseLimit = !isSelected && selectedBluffCategories.length >= MAX_CATEGORIES;
+
+        button.classList.toggle("active", isSelected);
+        button.classList.toggle("disabled", !bluffIsHost || disableBecauseLimit);
+        button.disabled = !bluffIsHost || disableBecauseLimit;
+
+        if (bluffIsHost) {
+            button.onclick = () => toggleBluffCategory(key);
+        }
+
+        container.appendChild(button);
+    });
+}
+
 function showBluffSetup() {
     const name = document.getElementById("bluffName").value.trim();
 
@@ -402,7 +496,7 @@ async function createBluffRoom() {
             character_id: selectedBluffCharacter,
             max_player_count: playerCount,
             total_rounds: totalRounds,
-            categories: selectedBluffCategories,
+            categories: [],
             round_timer_seconds: selectedBluffRoundTimer
         })
     });
@@ -663,7 +757,12 @@ async function leaveBluffRoom() {
 async function deleteBluffRoom() {
     if (!currentBluffRoomCode || !currentBluffPlayerId) return;
 
-    const confirmed = confirm("هل أنت متأكد أنك تريد حذف الغرفة بالكامل؟");
+    const confirmed = await openAppConfirm("هل أنت متأكد أنك تريد حذف الغرفة بالكامل؟", {
+        title: "حذف الغرفة",
+        confirmLabel: "حذف الغرفة",
+        cancelLabel: "إلغاء",
+        danger: true,
+    });
     if (!confirmed) return;
 
     const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/delete`, {
@@ -685,13 +784,49 @@ async function deleteBluffRoom() {
     window.location.reload();
 }
 
+async function removeBluffPlayer(playerIdToRemove) {
+    const confirmed = await openAppConfirm("هل أنت متأكد أنك تريد حذف هذا اللاعب من الغرفة؟", {
+        title: "حذف لاعب",
+        confirmLabel: "حذف اللاعب",
+        cancelLabel: "إلغاء",
+        danger: true,
+    });
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/remove-player`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            host_id: currentBluffPlayerId,
+            player_id_to_remove: playerIdToRemove
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showBluffError(data.detail || "تعذر حذف اللاعب.");
+        return;
+    }
+
+    hideBluffError();
+    renderBluffState(data);
+}
+
 async function refreshBluffRoomState() {
     if (!currentBluffRoomCode) return;
 
     const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}`);
-    if (!response.ok) return;
+    if (!response.ok) {
+        if (response.status === 404) {
+            await handleBluffRoomExit("تم حذف الغرفة أو لم تعد متاحة.");
+        }
+        return;
+    }
 
     const data = await response.json();
+    if (!ensureCurrentBluffPlayerStillInRoom(data)) return;
+
     currentBluffRoomData = data;
     bluffIsHost = currentBluffPlayerId === data.host_id;
 
@@ -758,6 +893,8 @@ function buildBluffStateSignature(data) {
         .map((player) => `${player.id}:${player.score}`)
         .join("|");
 
+    const categoriesSignature = (data.categories || []).join("|");
+
     const optionsSignature = (data.answer_options || [])
         .map((option) => `${option.id}:${option.votes_received}`)
         .join("|");
@@ -770,6 +907,7 @@ function buildBluffStateSignature(data) {
         current_category_chooser_id: data.current_category_chooser_id,
         current_round_category: data.current_round_category,
         current_question: data.current_question,
+        categories: categoriesSignature,
         submissions_count: data.submissions_count,
         picks_count: data.picks_count,
         submitted_player_ids: data.submitted_player_ids,
@@ -789,6 +927,13 @@ function renderBluffWaitingRoom(data) {
 
     document.getElementById("bluffDisplayCode").textContent = data.room_code;
 
+    const actionsHeader = document.getElementById("bluffActionsHeader");
+    if (bluffIsHost) {
+        actionsHeader.style.display = "";
+    } else {
+        actionsHeader.style.display = "none";
+    }
+
     const playerList = document.getElementById("bluffPlayerList");
     playerList.innerHTML = "";
 
@@ -799,6 +944,7 @@ function renderBluffWaitingRoom(data) {
             row.innerHTML = `
                 <td>${buildBluffPlayerIdentity(player)}</td>
                 <td>${player.score}</td>
+                ${buildBluffRemoveActionCell(player.id)}
             `;
             playerList.appendChild(row);
         });
@@ -844,7 +990,7 @@ function renderBluffCategoryPickPhase(data) {
     });
 
     renderBluffPlayerStatusList(data, "bluffPlayerStatusCategoryPick", "category_pick");
-    renderBluffScoreboard(data.players, "bluffScoreboardCategoryPick");
+    renderBluffScoreboard(data.players, "bluffScoreboardCategoryPick", false, true);
 }
 
 function renderBluffSubmissionPhase(data) {
@@ -877,7 +1023,7 @@ function renderBluffSubmissionPhase(data) {
     }
 
     renderBluffPlayerStatusList(data, "bluffPlayerStatusSubmission", "submission");
-    renderBluffScoreboard(data.players, "bluffScoreboardSubmission");
+    renderBluffScoreboard(data.players, "bluffScoreboardSubmission", false, true);
 }
 
 function renderBluffAnswerPickPhase(data) {
@@ -925,7 +1071,7 @@ function renderBluffAnswerPickPhase(data) {
         optionsContainer.appendChild(button);
     });
 
-    renderBluffScoreboard(data.players, "bluffScoreboardAnswerPick");
+    renderBluffScoreboard(data.players, "bluffScoreboardAnswerPick", false, true);
 }
 
 function renderBluffRoundResult(data) {
@@ -1009,6 +1155,7 @@ function renderBluffRankingResultTable(data) {
             <td>${buildBluffPlayerIdentity(player, false)}</td>
             <td>${player.score}</td>
             <td>${delta > 0 ? `+${delta}` : "-"}</td>
+            ${buildBluffRemoveActionCell(player.id)}
         `;
 
         tbody.appendChild(row);
@@ -1032,7 +1179,7 @@ function renderBluffGameOver(data) {
         document.getElementById("bluffFinalMsg").textContent = 
             "انتهت اللعبة! عدد اللاعبين غير كافي للمتابعة.";
         
-        renderBluffScoreboard(data.players, "bluffScoreboardFinal", true);
+        renderBluffScoreboard(data.players, "bluffScoreboardFinal", true, true);
         
         const adminArea = document.getElementById("bluffGameOverAdminArea");
         const memberArea = document.getElementById("bluffGameOverMemberArea");
@@ -1056,7 +1203,7 @@ function renderBluffGameOver(data) {
             ? `انتهت اللعبة! تعادل بين: ${winnerNames}`
             : `الفائز هو: ${winnerNames}`;
 
-    renderBluffScoreboard(data.players, "bluffScoreboardFinal", true);
+    renderBluffScoreboard(data.players, "bluffScoreboardFinal", true, true);
 
     const adminArea = document.getElementById("bluffGameOverAdminArea");
     const memberArea = document.getElementById("bluffGameOverMemberArea");
@@ -1103,7 +1250,7 @@ function renderBluffPlayerStatusList(data, containerId, mode) {
     });
 }
 
-function renderBluffScoreboard(players, containerId, withPodium = false) {
+function renderBluffScoreboard(players, containerId, withPodium = false, showActions = false) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
@@ -1125,11 +1272,13 @@ function renderBluffScoreboard(players, containerId, withPodium = false) {
                 <td>${index + 1}</td>
                 <td>${buildBluffPlayerIdentity(player)}</td>
                 <td>${player.score}</td>
+                ${buildBluffRemoveActionCell(player.id, showActions)}
             `;
         } else {
             row.innerHTML = `
                 <td>${buildBluffPlayerIdentity(player)}</td>
                 <td>${player.score}</td>
+                ${buildBluffRemoveActionCell(player.id, showActions)}
             `;
         }
 
@@ -1166,6 +1315,141 @@ function updateBluffLiveTimer(data) {
 function findMyPickFromRoomState(data) {
     if (!data?.picks || !currentBluffPlayerId) return null;
     return data.picks[currentBluffPlayerId] || null;
+}
+
+async function createBluffRoom() {
+    const hostName = document.getElementById("bluffName").value.trim();
+    const playerCount = selectedBluffPlayerCount;
+    const totalRounds = selectedBluffRounds;
+
+    if (!hostName) {
+        showBluffError("\u0627\u0644\u0631\u062c\u0627\u0621 \u0625\u062f\u062e\u0627\u0644 \u0627\u0644\u0627\u0633\u0645 \u0623\u0648\u0644\u0627\u064b!");
+        return;
+    }
+
+    if (!playerCount) {
+        showBluffError("\u0627\u062e\u062a\u0631 \u0639\u062f\u062f \u0627\u0644\u0644\u0627\u0639\u0628\u064a\u0646 \u0623\u0648\u0644\u0627\u064b!");
+        return;
+    }
+
+    if (!totalRounds) {
+        showBluffError("\u0627\u062e\u062a\u0631 \u0639\u062f\u062f \u0627\u0644\u062c\u0648\u0644\u0627\u062a \u0623\u0648\u0644\u0627\u064b!");
+        return;
+    }
+
+    if (totalRounds < playerCount) {
+        showBluffError("\u0639\u062f\u062f \u0627\u0644\u062c\u0648\u0644\u0627\u062a \u064a\u062c\u0628 \u0623\u0646 \u064a\u0643\u0648\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u0628\u0639\u062f\u062f \u0627\u0644\u0644\u0627\u0639\u0628\u064a\u0646.");
+        return;
+    }
+
+    const response = await fetch("/api/bluff/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            host_name: hostName,
+            character_id: selectedBluffCharacter,
+            max_player_count: playerCount,
+            total_rounds: totalRounds,
+            categories: [],
+            round_timer_seconds: selectedBluffRoundTimer
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showBluffError(data.detail || "\u062d\u062f\u062b \u062e\u0637\u0623 \u0623\u062b\u0646\u0627\u0621 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u063a\u0631\u0641\u0629.");
+        return;
+    }
+
+    currentBluffRoomCode = data.room_code;
+    currentBluffPlayerId = data.host_id;
+    currentBluffPlayerName = hostName;
+    currentBluffRoomData = data;
+    bluffIsHost = true;
+    selectedBluffCategories = [...(data.categories || [])];
+    lastRenderedBluffSignature = null;
+
+    localStorage.setItem("bluff_room_code", currentBluffRoomCode);
+    localStorage.setItem("bluff_player_id", currentBluffPlayerId);
+    localStorage.setItem("bluff_player_name", currentBluffPlayerName);
+
+    hideBluffError();
+    renderBluffWaitingRoom(data);
+}
+
+async function startBluffGame() {
+    if ((currentBluffRoomData?.categories || []).length === 0) {
+        showBluffError("\u0627\u062e\u062a\u0631 \u062a\u0635\u0646\u064a\u0641\u0627\u064b \u0648\u0627\u062d\u062f\u0627\u064b \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u0642\u0628\u0644 \u0628\u062f\u0621 \u0627\u0644\u0644\u0639\u0628\u0629.");
+        return;
+    }
+
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/start`, {
+        method: "POST"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showBluffError(data.detail || "\u062a\u0639\u0630\u0631 \u0628\u062f\u0621 \u0627\u0644\u0644\u0639\u0628\u0629.");
+        return;
+    }
+
+    currentBluffRoomData = data;
+    bluffIsHost = currentBluffPlayerId === data.host_id;
+    lastRenderedBluffSignature = null;
+
+    renderBluffState(data);
+}
+
+function renderBluffWaitingRoom(data) {
+    hideAllBluffScreens();
+    document.getElementById("screen-bluff-wait").classList.remove("hidden");
+
+    currentBluffRoomData = data;
+    selectedBluffCategories = [...(data.categories || [])];
+
+    document.getElementById("bluffDisplayCode").textContent = data.room_code;
+    renderBluffPregameCategories(data);
+
+    const actionsHeader = document.getElementById("bluffActionsHeader");
+    if (bluffIsHost) {
+        actionsHeader.style.display = "";
+    } else {
+        actionsHeader.style.display = "none";
+    }
+
+    const playerList = document.getElementById("bluffPlayerList");
+    playerList.innerHTML = "";
+
+    [...data.players]
+        .sort((a, b) => b.score - a.score)
+        .forEach((player) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${buildBluffPlayerIdentity(player)}</td>
+                <td>${player.score}</td>
+                ${buildBluffRemoveActionCell(player.id)}
+            `;
+            playerList.appendChild(row);
+        });
+
+    const hostArea = document.getElementById("bluffHostArea");
+    const memberArea = document.getElementById("bluffMemberArea");
+    const startButton = document.querySelector("#bluffHostArea .btn-primary");
+
+    if (startButton) {
+        startButton.disabled = selectedBluffCategories.length === 0;
+        startButton.classList.toggle("disabled", selectedBluffCategories.length === 0);
+    }
+
+    if (bluffIsHost) {
+        hostArea.classList.remove("hidden");
+        memberArea.classList.add("hidden");
+    } else {
+        hostArea.classList.add("hidden");
+        memberArea.classList.remove("hidden");
+    }
 }
 
 function resetBluffAndExit() {

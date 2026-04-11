@@ -43,10 +43,6 @@
         <label>مدة الجولة:</label>
         <div id="drawTimerGrid" class="category-grid"></div>
 
-        <label>التصنيفات:</label>
-        <div id="drawCategorySelectionInfo" style="color:#aaa; margin-bottom:10px;">تم اختيار 0</div>
-        <div id="drawCategoryGrid" class="category-grid"></div>
-
         <button class="btn btn-primary" onclick="createDrawRoom()">تأكيد الإعدادات</button>
         <button class="btn" onclick="goBackToDrawLobby()">رجوع</button>
     </div>
@@ -60,10 +56,17 @@
                     <tr>
                         <th>اللاعب</th>
                         <th>النقاط</th>
+                        <th>الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody id="drawPlayerList"></tbody>
             </table>
+        </div>
+
+        <div id="drawPregameCategories" style="margin: 18px 0;">
+            <label>التصنيفات:</label>
+            <div id="drawCategorySelectionInfo" style="color:#aaa; margin-bottom:10px;">تم اختيار 0 / 12</div>
+            <div id="drawCategoryGrid" class="category-grid"></div>
         </div>
 
         <div id="drawHostArea" class="hidden">
@@ -90,6 +93,7 @@
                     <tr>
                         <th>اللاعب</th>
                         <th>النقاط</th>
+                        <th>الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody id="drawScoreboardChoice"></tbody>
@@ -147,6 +151,7 @@
                                 <th>اللاعب</th>
                                 <th>الحالة</th>
                                 <th>النقاط</th>
+                                <th>الإجراءات</th>
                             </tr>
                         </thead>
                         <tbody id="drawPlayersState"></tbody>
@@ -175,6 +180,7 @@
                         <th>اللاعب</th>
                         <th>النقاط</th>
                         <th>زيادة هذه الجولة</th>
+                        <th>الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody id="drawRankingTableBody"></tbody>
@@ -200,6 +206,7 @@
                         <th>الترتيب</th>
                         <th>اللاعب</th>
                         <th>النقاط</th>
+                        <th>الإجراءات</th>
                     </tr>
                 </thead>
                 <tbody id="drawFinalScoreboard"></tbody>

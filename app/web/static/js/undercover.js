@@ -19,6 +19,7 @@ let lastAnnouncementKey = null;
 let selectedPlayerCount = null;
 let selectedUndercoverCount = null;
 let selectedCategories = [];
+let allUndercoverCategories = [];
 const MAX_CATEGORIES = 12;
 
 const playerCountOptions = [3, 4, 5, 6, 7, 8, 9, 10];
@@ -49,6 +50,52 @@ function showUndercoverError(message) {
 function hideUndercoverError() {
     const errorDiv = document.getElementById('undercover-global-error');
     errorDiv.classList.add('hidden');
+}
+
+async function handleUndercoverRoomExit(message) {
+    clearLocalGameState();
+    await openAppAlert(message, {
+        title: "تمت إزالتك",
+        confirmLabel: "الخروج",
+        danger: true,
+    });
+    window.location.reload();
+}
+
+function ensureCurrentPlayerStillInRoom(data) {
+    if ((data.players || []).some((player) => player.id === currentPlayerId)) {
+        return true;
+    }
+
+    handleUndercoverRoomExit("تمت إزالتك من الغرفة.");
+    return false;
+}
+
+function buildUndercoverRemoveButton(playerId) {
+    if (!isHost || playerId === currentPlayerId) {
+        return "";
+    }
+
+    return `<button class="btn-sm" onclick="removeUndercoverPlayer('${playerId}')">حذف</button>`;
+}
+
+function renderUndercoverPlayerList(containerId, data, includeVotes = false) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    data.players.forEach((player) => {
+        const row = document.createElement("div");
+        row.className = "vote-item" + (player.is_eliminated ? " eliminated" : "");
+
+        const suffix = includeVotes ? ` (${getVotesReceived(data, player.id)})` : "";
+        row.innerHTML = `
+            <span>${player.name}${suffix}</span>
+            ${buildUndercoverRemoveButton(player.id)}
+        `;
+        container.appendChild(row);
+    });
 }
 /**
  * Initialize page.
@@ -402,6 +449,10 @@ async function showRevealScreen() {
     const data = await response.json();
 
     if (!response.ok) {
+        if (data.detail === "Player not found.") {
+            await handleUndercoverRoomExit("تمت إزالتك من الغرفة.");
+            return;
+        }
         showUndercoverError(data.detail || "تعذر جلب الكلمة.");
         return;
     }
@@ -414,6 +465,10 @@ async function showRevealScreen() {
     const wordBox = document.getElementById("mondasWord");
     wordBox.textContent = cachedSecretWord;
     wordBox.classList.add("blur");
+
+    if (currentRoomData) {
+        renderUndercoverPlayerList("revealPlayerList", currentRoomData);
+    }
 }
 
 /**
@@ -440,10 +495,15 @@ async function refreshRoomState() {
     const response = await fetch(`/api/undercover/rooms/${currentRoomCode}`);
 
     if (!response.ok) {
+        if (response.status === 404) {
+            await handleUndercoverRoomExit("تم حذف الغرفة أو لم تعد متاحة.");
+        }
         return;
     }
 
     const data = await response.json();
+    if (!ensureCurrentPlayerStillInRoom(data)) return;
+
     currentRoomData = data;
     isHost = currentPlayerId === data.host_id;
 
@@ -550,18 +610,7 @@ function renderWaitingRoom(data) {
     switchScreen("screen-wait");
 
     document.getElementById("displayCode").textContent = data.room_code;
-
-    const playerList = document.getElementById("playerList");
-    playerList.innerHTML = "";
-
-    data.players.forEach((player) => {
-        const badge = document.createElement("span");
-        badge.style.background = "#333";
-        badge.style.padding = "5px 10px";
-        badge.style.borderRadius = "5px";
-        badge.textContent = player.name;
-        playerList.appendChild(badge);
-    });
+    renderUndercoverPlayerList("playerList", data);
 
     const adminArea = document.getElementById("adminArea");
     const memberArea = document.getElementById("memberArea");
@@ -673,6 +722,7 @@ function renderVoters(data) {
         div.innerHTML = `
             <span>${player.name} (${votesReceived})</span>
             ${buttonHtml}
+            ${buildUndercoverRemoveButton(player.id)}
         `;
 
         container.appendChild(div);
@@ -757,6 +807,54 @@ async function submitVotes() {
     announceRoundEventIfNeeded(data);
 }
 
+async function removeUndercoverPlayer(playerIdToRemove) {
+    const confirmed = await openAppConfirm("هل أنت متأكد أنك تريد حذف هذا اللاعب من الغرفة؟", {
+        title: "حذف لاعب",
+        confirmLabel: "حذف اللاعب",
+        cancelLabel: "إلغاء",
+        danger: true,
+    });
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/undercover/rooms/${currentRoomCode}/remove-player`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            host_id: currentPlayerId,
+            player_id_to_remove: playerIdToRemove
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showUndercoverError(data.detail || "تعذر حذف اللاعب.");
+        return;
+    }
+
+    selectedVotes = selectedVotes.filter((playerId) => playerId !== playerIdToRemove);
+    currentRoomData = data;
+    isHost = currentPlayerId === data.host_id;
+    lastRenderedSignature = null;
+
+    if (data.ended) {
+        renderGameOver(data);
+        return;
+    }
+
+    if (!data.started) {
+        renderWaitingRoom(data);
+        return;
+    }
+
+    if (currentScreen === "screen-reveal") {
+        renderUndercoverPlayerList("revealPlayerList", data);
+        return;
+    }
+
+    renderPlayScreen(data);
+}
+
 /**
  * Restart current game with same players.
  */
@@ -822,7 +920,12 @@ async function leaveCurrentRoom() {
 async function deleteCurrentRoom() {
     if (!currentRoomCode || !currentPlayerId) return;
 
-    const confirmed = confirm("هل أنت متأكد أنك تريد حذف الغرفة بالكامل؟");
+    const confirmed = await openAppConfirm("هل أنت متأكد أنك تريد حذف الغرفة بالكامل؟", {
+        title: "حذف الغرفة",
+        confirmLabel: "حذف الغرفة",
+        cancelLabel: "إلغاء",
+        danger: true,
+    });
     if (!confirmed) return;
 
     const response = await fetch(`/api/undercover/rooms/${currentRoomCode}/delete`, {
@@ -871,6 +974,282 @@ function renderGameOver(data) {
         replayArea.classList.add("hidden");
         memberArea.classList.remove("hidden");
     }
+
+    renderUndercoverPlayerList("gameOverPlayerList", data);
+}
+
+async function loadCategories() {
+    const response = await fetch("/api/undercover/categories");
+    const data = await response.json();
+    allUndercoverCategories = Object.keys(data.categories || {});
+}
+
+async function toggleCategory(categoryKey) {
+    if (!isHost || currentRoomData?.started) {
+        return;
+    }
+
+    const isSelected = selectedCategories.includes(categoryKey);
+    let nextCategories;
+
+    if (isSelected) {
+        nextCategories = selectedCategories.filter((c) => c !== categoryKey);
+    } else {
+        if (selectedCategories.length >= MAX_CATEGORIES) {
+            showUndercoverError(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
+            return;
+        }
+        nextCategories = [...selectedCategories, categoryKey];
+    }
+
+    const response = await fetch(`/api/undercover/rooms/${currentRoomCode}/categories`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            host_id: currentPlayerId,
+            categories: nextCategories
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showUndercoverError(data.detail || "تعذر تحديث التصنيفات.");
+        return;
+    }
+
+    currentRoomData = data;
+    selectedCategories = [...(data.categories || [])];
+    isHost = currentPlayerId === data.host_id;
+    lastRenderedSignature = null;
+    renderWaitingRoom(data);
+}
+
+function updateCategoryButtonsState() {
+    const info = document.getElementById("categorySelectionInfo");
+    const canEdit = isHost && currentRoomData && !currentRoomData.started;
+    if (info) {
+        info.textContent = `تم اختيار ${selectedCategories.length} / ${MAX_CATEGORIES}`;
+    }
+
+    const buttons = document.querySelectorAll("#mondasCategoryGrid .category-btn");
+
+    buttons.forEach((btn) => {
+        const key = btn.dataset.categoryKey;
+        const isSelected = selectedCategories.includes(key);
+
+        btn.classList.toggle("active", isSelected);
+
+        if (!canEdit) {
+            btn.classList.add("disabled");
+            btn.disabled = true;
+            return;
+        }
+
+        if (!isSelected && selectedCategories.length >= MAX_CATEGORIES) {
+            btn.classList.add("disabled");
+            btn.disabled = true;
+        } else {
+            btn.classList.remove("disabled");
+            btn.disabled = false;
+        }
+    });
+}
+
+function renderUndercoverPregameCategories(data) {
+    const container = document.getElementById("mondasCategoryGrid");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    allUndercoverCategories.forEach((key) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-btn";
+        button.dataset.categoryKey = key;
+        button.textContent = categoryLabels[key] || key;
+        button.onclick = () => toggleCategory(key);
+        container.appendChild(button);
+    });
+
+    const info = document.getElementById("categorySelectionInfo");
+    if (info && !isHost) {
+        info.textContent = data.categories?.length
+            ? `المنظم يختار التصنيفات الآن: ${data.categories.length} / ${MAX_CATEGORIES}`
+            : `المنظم لم يختر أي تصنيف بعد`;
+    }
+
+    updateCategoryButtonsState();
+}
+
+async function createRoom() {
+    const hostName = currentPlayerName || document.getElementById("pName").value.trim();
+    const playerCount = selectedPlayerCount;
+    const undercoverCount = selectedUndercoverCount;
+
+    if (!hostName) {
+        showUndercoverError("الرجاء إدخال الاسم أولاً!");
+        return;
+    }
+
+    if (!playerCount) {
+        showUndercoverError("اختر عدد اللاعبين أولاً!");
+        return;
+    }
+
+    if (!undercoverCount) {
+        showUndercoverError("اختر عدد المندسين أولاً!");
+        return;
+    }
+
+    const response = await fetch("/api/undercover/rooms", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            host_name: hostName,
+            max_player_count: playerCount,
+            undercover_count: undercoverCount,
+            categories: []
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showUndercoverError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        return;
+    }
+
+    const hostPlayer = data.players.find((player) => player.id === data.host_id);
+    if (!hostPlayer) {
+        showUndercoverError("تعذر تحديد صاحب الغرفة.");
+        return;
+    }
+
+    currentRoomCode = data.room_code;
+    currentPlayerId = data.host_id;
+    currentPlayerName = hostName;
+    currentRoomData = data;
+    isHost = true;
+    selectedVotes = [];
+    cachedSecretWord = "";
+    selectedCategories = [...(data.categories || [])];
+    lastRenderedSignature = null;
+    lastAnnouncementKey = null;
+
+    localStorage.setItem("undercover_room_code", currentRoomCode);
+    localStorage.setItem("undercover_player_id", currentPlayerId);
+    localStorage.setItem("undercover_player_name", currentPlayerName);
+
+    renderWaitingRoom(data);
+}
+
+async function startMondasGame() {
+    if (!currentRoomData?.categories?.length) {
+        showUndercoverError("اختر تصنيفًا واحدًا على الأقل قبل بدء اللعبة.");
+        return;
+    }
+
+    const response = await fetch(`/api/undercover/rooms/${currentRoomCode}/start`, {
+        method: "POST"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showUndercoverError(data.detail || "تعذر بدء اللعبة.");
+        return;
+    }
+
+    currentRoomData = data;
+    isHost = currentPlayerId === data.host_id;
+    selectedVotes = [];
+    lastRenderedSignature = null;
+    lastAnnouncementKey = null;
+    await showRevealScreen();
+}
+
+function buildStateSignature(data) {
+    const playersSignature = data.players
+        .map((player) => `${player.id}:${player.is_eliminated ? 1 : 0}`)
+        .join("|");
+
+    const votesSignature = Object.entries(data.votes || {})
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([voterId, targets]) => `${voterId}:${targets.slice().sort().join(",")}`)
+        .join("|");
+
+    return JSON.stringify({
+        started: data.started,
+        ended: data.ended,
+        winner: data.winner,
+        round_number: data.round_number,
+        current_asker_id: data.current_asker_id,
+        current_target_id: data.current_target_id,
+        eliminated_player_id: data.eliminated_player_id,
+        eliminated_player_is_undercover: data.eliminated_player_is_undercover,
+        last_vote_result: data.last_vote_result,
+        categories: (data.categories || []).join(","),
+        players: playersSignature,
+        votes: votesSignature
+    });
+}
+
+function renderWaitingRoom(data) {
+    switchScreen("screen-wait");
+    currentRoomData = data;
+    selectedCategories = [...(data.categories || [])];
+
+    document.getElementById("displayCode").textContent = data.room_code;
+    renderUndercoverPlayerList("playerList", data);
+    renderUndercoverPregameCategories(data);
+
+    const adminArea = document.getElementById("adminArea");
+    const memberArea = document.getElementById("memberArea");
+    const waitMsg = document.getElementById("waitMsg");
+
+    if (isHost) {
+        adminArea.classList.remove("hidden");
+        memberArea.classList.add("hidden");
+        waitMsg.classList.add("hidden");
+    } else {
+        adminArea.classList.add("hidden");
+        memberArea.classList.remove("hidden");
+        waitMsg.classList.remove("hidden");
+    }
+    updateUndercoverRoomActionButtons();
+}
+
+async function restartGame() {
+    const undercoverCount = selectedUndercoverCount || currentRoomData?.undercover_count;
+    const categories = selectedCategories.length > 0
+        ? selectedCategories
+        : currentRoomData?.categories || [];
+
+    const response = await fetch(`/api/undercover/rooms/${currentRoomCode}/restart`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            categories,
+            undercover_count: undercoverCount
+        })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        showUndercoverError(data.detail || "تعذر إعادة اللعبة.");
+        return;
+    }
+
+    cachedSecretWord = "";
+    selectedVotes = [];
+    currentRoomData = data;
+    isHost = currentPlayerId === data.host_id;
+    selectedCategories = [...(data.categories || [])];
+    lastRenderedSignature = null;
+    lastAnnouncementKey = null;
+    renderWaitingRoom(data);
 }
 
 /**
