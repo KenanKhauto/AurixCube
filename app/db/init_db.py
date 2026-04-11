@@ -3,15 +3,19 @@
 from app.db.base import Base
 from app.db.models import User, Friend, GameInvite  # noqa: F401
 from app.db.session import engine
-from sqlalchemy import text
+from sqlalchemy import inspect, text
+
+
+def _get_column_names(table_name: str) -> set[str]:
+    inspector = inspect(engine)
+    return {column["name"] for column in inspector.get_columns(table_name)}
 
 
 def _ensure_profile_image_column() -> None:
-    """Add the missing profile_image column for existing SQLite databases."""
-    with engine.begin() as connection:
-        result = connection.execute(text("PRAGMA table_info(users)"))
-        columns = [row[1] for row in result.fetchall()]
-        if "profile_image" not in columns:
+    """Add the missing profile_image column for existing databases."""
+    columns = _get_column_names("users")
+    if "profile_image" not in columns:
+        with engine.begin() as connection:
             connection.execute(
                 text("ALTER TABLE users ADD COLUMN profile_image VARCHAR(255)")
             )
@@ -24,11 +28,10 @@ def _ensure_profile_image_column() -> None:
 
 
 def _ensure_friend_status_column() -> None:
-    """Add the missing status column for existing SQLite databases."""
-    with engine.begin() as connection:
-        result = connection.execute(text("PRAGMA table_info(friends)"))
-        columns = [row[1] for row in result.fetchall()]
-        if "status" not in columns:
+    """Add the missing status column for existing databases."""
+    columns = _get_column_names("friends")
+    if "status" not in columns:
+        with engine.begin() as connection:
             connection.execute(
                 text("ALTER TABLE friends ADD COLUMN status VARCHAR(20) DEFAULT 'accepted'")
             )
