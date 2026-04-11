@@ -37,6 +37,7 @@
 .nav-right {
     min-width: 120px;
     justify-content: flex-end;
+    gap: 12px;
 }
 
 .nav-center {
@@ -70,6 +71,41 @@
     opacity: 1;
     transform: translateY(-1px) scale(1.04);
     filter: drop-shadow(0 0 8px rgba(255, 215, 80, 0.85));
+}
+
+.nav-action-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid rgba(214, 176, 106, 0.3);
+    background: radial-gradient(circle at 30% 30%, rgba(255, 226, 148, 0.22), rgba(43, 28, 12, 0.98));
+    color: var(--brand-gold-strong);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    flex-shrink: 0;
+}
+
+.nav-action-btn i {
+    font-size: 18px;
+}
+
+.nav-action-btn:hover {
+    transform: translateY(-1px) scale(1.04);
+    border-color: rgba(255, 215, 80, 0.6);
+    box-shadow: 0 0 16px rgba(255, 215, 80, 0.24);
+}
+
+.nav-game-requests-btn {
+    color: #f2c14b;
+}
+
+.nav-game-requests-btn i {
+    color: #f2c14b;
+    text-shadow: 0 0 8px rgba(242, 193, 75, 0.45);
 }
 
 .logo {

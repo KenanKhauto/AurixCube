@@ -46,11 +46,13 @@
         <!-- RIGHT -->
         <div class="nav-right">
             {% if current_user %}
+                <button type="button" class="nav-action-btn nav-game-requests-btn" onclick="showGameRequests()" aria-label="طلبات اللعب" title="طلبات اللعب">
+                    <i class="fa-solid fa-bell"></i>
+                </button>
                 <div class="profile-dropdown">
                     <img src="/static/images/{{ current_user.profile_image or 'profile_img_default.png' }}" class="nav-img profile-trigger" alt="Profile" onclick="toggleProfileDropdown()">
                     <div id="profileDropdown" class="profile-dropdown-menu hidden">
                         <a href="/profile">الملف الشخصي</a>
-                        <a href="#" onclick="showNotifications()">الإشعارات</a>
                     </div>
                 </div>
             {% else %}
@@ -405,7 +407,7 @@ function buildInviteNotificationCard(invite) {
     return wrapper;
 }
 
-async function loadNotificationsPanel() {
+async function loadGameRequestsPanel() {
     const response = await fetch("/invites");
     const invites = response.ok ? await response.json() : [];
 
@@ -422,7 +424,7 @@ async function loadNotificationsPanel() {
     }
 
     openAppPanel({
-        title: "الإشعارات",
+        title: "طلبات اللعب",
         bodyNode: body,
     });
 }
@@ -525,7 +527,7 @@ async function respondToInvite(inviteId, action) {
         return;
     }
 
-    await loadNotificationsPanel();
+    await loadGameRequestsPanel();
 }
 
 function toggleProfileDropdown() {
@@ -535,8 +537,8 @@ function toggleProfileDropdown() {
     }
 }
 
-function showNotifications() {
-    loadNotificationsPanel();
+function showGameRequests() {
+    loadGameRequestsPanel();
 }
 
 document.addEventListener("click", function(event) {
