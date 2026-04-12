@@ -34,6 +34,7 @@ const bluffRoundTimerOptions = [
 
 let selectedBluffCharacter = localStorage.getItem("bluff_character_id") || "char1";
 const bluffCharacterOptions = Array.from({ length: 12 }, (_, i) => `char${i + 1}`);
+let bluffFriendCachePrimed = false;
 
 function showBluffError(message) {
     const errorDiv = document.getElementById('bluff-global-error');
@@ -73,6 +74,92 @@ function buildBluffRemoveActionCell(playerId, showActions = true) {
     return "<td></td>";
 }
 
+function buildBluffLobbyActionCell(player) {
+    const actions = [];
+    if (bluffIsHost && player.id !== currentBluffPlayerId) {
+        actions.push(`<button class="btn btn-danger" onclick="removeBluffPlayer('${player.id}')">حذف</button>`);
+    }
+    if (window.appCurrentUser && typeof canSendFriendRequestToUsername === "function" && canSendFriendRequestToUsername(player.username)) {
+        const encodedUsername = encodeURIComponent(player.username);
+        actions.push(`<button class="btn" onclick="sendBluffFriendRequest('${encodedUsername}', this)">Add Friend</button>`);
+    }
+    if (!actions.length) return "<td></td>";
+    return `<td>${actions.join(" ")}</td>`;
+}
+
+async function sendBluffFriendRequest(encodedUsername, buttonEl) {
+    const username = decodeURIComponent(encodedUsername || "");
+    if (!username || typeof sendFriendRequestByUsername !== "function") return;
+    if (buttonEl) buttonEl.disabled = true;
+    try {
+        const success = await sendFriendRequestByUsername(username);
+        if (success && buttonEl) {
+            buttonEl.textContent = "Requested";
+            buttonEl.classList.add("disabled");
+        } else if (buttonEl) {
+            buttonEl.disabled = false;
+        }
+    } catch (error) {
+        if (buttonEl) buttonEl.disabled = false;
+        console.error("Failed to send friend request:", error);
+    }
+}
+
+async function primeBluffFriendCache() {
+    if (bluffFriendCachePrimed || !window.appCurrentUser || typeof ensureAppFriendCache !== "function") return;
+    await ensureAppFriendCache();
+    bluffFriendCachePrimed = true;
+    if (currentBluffRoomData && (!currentBluffRoomData.started || currentBluffRoomData.phase === "waiting")) {
+        renderBluffWaitingRoom(currentBluffRoomData);
+    }
+}
+
+function renderBluffLobbyCharacterPicker(data) {
+    const grid = document.getElementById("bluffWaitCharacterGrid");
+    const preview = document.getElementById("bluffWaitCharacterPreview");
+    if (!grid || !preview) return;
+
+    const me = (data.players || []).find((player) => player.id === currentBluffPlayerId);
+    const activeCharacterId = me?.character_id || selectedBluffCharacter || "char1";
+    selectedBluffCharacter = activeCharacterId;
+    localStorage.setItem("bluff_character_id", selectedBluffCharacter);
+
+    preview.src = `/static/images/${activeCharacterId}.png`;
+    grid.innerHTML = "";
+
+    bluffCharacterOptions.forEach((characterId) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "character-btn";
+        button.dataset.characterId = characterId;
+        button.classList.toggle("active", characterId === activeCharacterId);
+        button.onclick = () => updateBluffLobbyCharacter(characterId);
+        button.innerHTML = `<img src="/static/images/${characterId}.png" class="character-btn-img" alt="${characterId}">`;
+        grid.appendChild(button);
+    });
+}
+
+async function updateBluffLobbyCharacter(characterId) {
+    if (!currentBluffRoomCode || !currentBluffPlayerId) return;
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/character`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            player_id: currentBluffPlayerId,
+            character_id: characterId,
+        }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showBluffError(data.detail || "Unable to update character.");
+        return;
+    }
+    selectedBluffCharacter = characterId;
+    localStorage.setItem("bluff_character_id", selectedBluffCharacter);
+    currentBluffRoomData = data;
+    renderBluffWaitingRoom(data);
+}
+
 const bluffPlayerCountOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 const bluffCategoryLabels = {
@@ -93,6 +180,7 @@ const bluffCategoryLabels = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
+    await primeBluffFriendCache();
     renderBluffPlayerCountButtons();
     renderBluffRoundsButtons();
     await loadBluffCategories();
@@ -930,10 +1018,9 @@ function renderBluffWaitingRoom(data) {
     document.getElementById("bluffDisplayCode").textContent = data.room_code;
 
     const actionsHeader = document.getElementById("bluffActionsHeader");
-    if (bluffIsHost) {
-        actionsHeader.style.display = "";
-    } else {
-        actionsHeader.style.display = "none";
+    const showLobbyActions = bluffIsHost || Boolean(window.appCurrentUser);
+    if (actionsHeader) {
+        actionsHeader.style.display = showLobbyActions ? "" : "none";
     }
 
     const playerList = document.getElementById("bluffPlayerList");
@@ -946,7 +1033,7 @@ function renderBluffWaitingRoom(data) {
             row.innerHTML = `
                 <td>${buildBluffPlayerIdentity(player)}</td>
                 <td>${player.score}</td>
-                ${buildBluffRemoveActionCell(player.id)}
+                ${buildBluffLobbyActionCell(player)}
             `;
             playerList.appendChild(row);
         });
@@ -1413,12 +1500,12 @@ function renderBluffWaitingRoom(data) {
 
     document.getElementById("bluffDisplayCode").textContent = data.room_code;
     renderBluffPregameCategories(data);
+    renderBluffLobbyCharacterPicker(data);
 
     const actionsHeader = document.getElementById("bluffActionsHeader");
-    if (bluffIsHost) {
-        actionsHeader.style.display = "";
-    } else {
-        actionsHeader.style.display = "none";
+    const showLobbyActions = bluffIsHost || Boolean(window.appCurrentUser);
+    if (actionsHeader) {
+        actionsHeader.style.display = showLobbyActions ? "" : "none";
     }
 
     const playerList = document.getElementById("bluffPlayerList");
@@ -1431,7 +1518,7 @@ function renderBluffWaitingRoom(data) {
             row.innerHTML = `
                 <td>${buildBluffPlayerIdentity(player)}</td>
                 <td>${player.score}</td>
-                ${buildBluffRemoveActionCell(player.id)}
+                ${buildBluffLobbyActionCell(player)}
             `;
             playerList.appendChild(row);
         });

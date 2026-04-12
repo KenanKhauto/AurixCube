@@ -186,6 +186,68 @@ function handleProfileImageError(imgEl) {
     imgEl.src = DEFAULT_PROFILE_IMAGE_URL;
 }
 
+let appFriendUsernames = new Set();
+let appFriendCachePromise = null;
+
+async function ensureAppFriendCache() {
+    if (!window.appCurrentUser) return appFriendUsernames;
+    if (appFriendCachePromise) return appFriendCachePromise;
+
+    appFriendCachePromise = (async () => {
+        try {
+            const response = await fetch("/friends");
+            if (response.ok) {
+                const friends = await response.json();
+                appFriendUsernames = new Set(
+                    (friends || [])
+                        .map((friend) => String(friend.username || "").trim().toLowerCase())
+                        .filter(Boolean)
+                );
+            }
+        } catch (error) {
+            console.error("Failed to load friend cache:", error);
+        }
+
+        if (window.appCurrentUser?.username) {
+            appFriendUsernames.add(String(window.appCurrentUser.username).trim().toLowerCase());
+        }
+        return appFriendUsernames;
+    })();
+
+    return appFriendCachePromise;
+}
+
+function canSendFriendRequestToUsername(username) {
+    const target = String(username || "").trim().toLowerCase();
+    if (!window.appCurrentUser || !target) return false;
+
+    const me = String(window.appCurrentUser.username || "").trim().toLowerCase();
+    if (!me || target === me) return false;
+
+    return !appFriendUsernames.has(target);
+}
+
+async function sendFriendRequestByUsername(username) {
+    if (!window.appCurrentUser || !username) return false;
+
+    const formData = new URLSearchParams();
+    formData.set("friend_username", username);
+
+    const response = await fetch("/friends", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData.toString(),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(data.detail || "تعذر إرسال طلب الصداقة.");
+    }
+
+    appFriendUsernames.add(String(username).trim().toLowerCase());
+    return true;
+}
+
 function toggleMenu() {
     document.getElementById("mobileMenu").classList.toggle("hidden");
 }

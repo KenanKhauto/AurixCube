@@ -3,8 +3,10 @@
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth.dependencies import get_current_user_optional
+from app.db.models.user import User
 from app.games.draw_guess.constants import DRAW_CATEGORIES
 from app.games.draw_guess.schemas import (
     DrawGuessAdvanceRoundRequest,
@@ -20,6 +22,7 @@ from app.games.draw_guess.schemas import (
     DrawGuessSelectWordRequest,
     DrawGuessStrokeView,
     DrawGuessUpdateCategoriesRequest,
+    DrawGuessUpdateCharacterRequest,
     DrawGuessWordOptionView,
 )
 from app.games.draw_guess.service import DrawGuessGameService
@@ -68,6 +71,7 @@ def build_room_response(room) -> DrawGuessRoomStateResponse:
             DrawGuessPlayerView(
                 id=p.id,
                 name=p.name,
+                username=p.username,
                 character_id=p.character_id,
                 score=room.scores.get(p.id, 0),
             )
@@ -102,10 +106,14 @@ def get_categories():
 
 
 @router.post("/rooms", response_model=DrawGuessRoomStateResponse)
-def create_room(payload: DrawGuessCreateRoomRequest):
+def create_room(
+    payload: DrawGuessCreateRoomRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+):
     try:
         room = service.create_room(
             host_name=payload.host_name,
+            auth_username=current_user.username if current_user else None,
             character_id=payload.character_id,
             max_player_count=payload.max_player_count,
             total_rounds=payload.total_rounds,
@@ -119,9 +127,27 @@ def create_room(payload: DrawGuessCreateRoomRequest):
 
 
 @router.post("/rooms/{room_code}/join", response_model=DrawGuessRoomStateResponse)
-def join_room(room_code: str, payload: DrawGuessJoinRoomRequest):
+def join_room(
+    room_code: str,
+    payload: DrawGuessJoinRoomRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+):
     try:
-        room = service.join_room(room_code, payload.player_name, payload.character_id)
+        room = service.join_room(
+            room_code,
+            payload.player_name,
+            payload.character_id,
+            current_user.username if current_user else None,
+        )
+        return build_room_response(room)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rooms/{room_code}/character", response_model=DrawGuessRoomStateResponse)
+def update_character(room_code: str, payload: DrawGuessUpdateCharacterRequest):
+    try:
+        room = service.update_character(room_code, payload.player_id, payload.character_id)
         return build_room_response(room)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

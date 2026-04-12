@@ -15,6 +15,7 @@ class WhoAmIPlayer:
 
     id: str
     name: str
+    username: Optional[str] = None
     identity: str = ""
     has_guessed_correctly: bool = False
     guess_count: int = 0

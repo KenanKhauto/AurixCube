@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import re
 import time
 import uuid
 from datetime import datetime
@@ -31,6 +32,7 @@ class BluffGameService:
         self,
         host_name: str,
         character_id:str,
+        auth_username: str | None,
         max_player_count: int,
         total_rounds: int,
         categories: list[str],
@@ -53,13 +55,18 @@ class BluffGameService:
             round_timer_seconds=round_timer_seconds,
         )
 
-        room.players[host_id] = BluffPlayer(id=host_id, name=host_name, character_id=character_id)
+        room.players[host_id] = BluffPlayer(
+            id=host_id,
+            name=host_name,
+            username=auth_username,
+            character_id=character_id,
+        )
         room.scores[host_id] = 0
 
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
-    def join_room(self, room_code: str, player_name: str, character_id: str) -> BluffRoom:
+    def join_room(self, room_code: str, player_name: str, character_id: str, auth_username: str | None) -> BluffRoom:
         room = self._get_room(room_code)
 
         if room.ended:
@@ -70,13 +77,34 @@ class BluffGameService:
 
         # Allow joining mid-game, new player starts with 0 points
         player_id = str(uuid.uuid4())
-        room.players[player_id] = BluffPlayer(id=player_id, name=player_name, character_id=character_id)
+        room.players[player_id] = BluffPlayer(
+            id=player_id,
+            name=player_name,
+            username=auth_username,
+            character_id=character_id,
+        )
         room.scores[player_id] = 0
 
         # If game is already started, add player to chooser order so they get a turn
         if room.started and len(room.chooser_order) > 0:
             room.chooser_order.append(player_id)
 
+        self._save_room(room)
+        return room
+
+    def update_character(self, room_code: str, player_id: str, character_id: str) -> BluffRoom:
+        room = self._get_room(room_code)
+
+        if room.started:
+            raise ValueError("Character can only be changed in lobby.")
+
+        if player_id not in room.players:
+            raise PlayerNotFoundError("Player not found.")
+
+        if not re.fullmatch(r"char([1-9]|1[0-2])", character_id):
+            raise ValueError("Invalid character.")
+
+        room.players[player_id].character_id = character_id
         self._save_room(room)
         return room
 
@@ -648,6 +676,7 @@ class BluffGameService:
                 player_id: {
                     "id": player.id,
                     "name": player.name,
+                    "username": player.username,
                     "character_id": player.character_id,
                 }
                 for player_id, player in room.players.items()
@@ -698,6 +727,7 @@ class BluffGameService:
             room.players[player_id] = BluffPlayer(
                 id=player_data["id"],
                 name=player_data["name"],
+                username=player_data.get("username"),
                 character_id=player_data.get("character_id", "char1")
             )
 
