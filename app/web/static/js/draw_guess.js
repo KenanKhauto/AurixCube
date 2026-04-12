@@ -73,8 +73,10 @@ function buildDrawRemoveActionCell(playerId, showActions = true) {
 
 const drawCategoryLabels = {
     animals: "حيوانات",
-    objects: "أشياء",
-    football: "كرة قدم",
+    objects: "جماد",
+    general_sports: "رياضة",
+    pc_setup: "تجميعات الكمبيوتر",
+    syrian_series: "مسلسلات سورية",
 };
 
 
