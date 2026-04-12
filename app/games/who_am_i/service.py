@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import re
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -31,6 +32,7 @@ class WhoAmIService:
         self,
         host_name: str,
         character_id:str,
+        auth_username: str | None,
         max_player_count: int,
         categories: list[str],
     ) -> WhoAmIRoom:
@@ -48,12 +50,17 @@ class WhoAmIService:
             categories=categories,
             max_player_count=max_player_count,
         )
-        room.players[host_id] = WhoAmIPlayer(id=host_id, name=host_name, character_id=character_id)
+        room.players[host_id] = WhoAmIPlayer(
+            id=host_id,
+            name=host_name,
+            username=auth_username,
+            character_id=character_id,
+        )
 
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
-    def join_room(self, room_code: str, player_name: str, character_id:str) -> WhoAmIRoom:
+    def join_room(self, room_code: str, player_name: str, character_id:str, auth_username: str | None) -> WhoAmIRoom:
         """
         Join an existing room. Allow joining even during active gameplay.
         """
@@ -70,13 +77,32 @@ class WhoAmIService:
 
         # Allow joining mid-game
         player_id = str(uuid.uuid4())
-        room.players[player_id] = WhoAmIPlayer(id=player_id, name=player_name, character_id=character_id)
+        room.players[player_id] = WhoAmIPlayer(
+            id=player_id,
+            name=player_name,
+            username=auth_username,
+            character_id=character_id,
+        )
 
         # If game is already started, add player to turn order
         if room.started:
             room.full_turn_order.append(player_id)
             room.active_turn_order.append(player_id)
 
+        self.room_repository.save_room(room_code, self._serialize_room(room))
+        return room
+
+    def update_character(self, room_code: str, player_id: str, character_id: str) -> WhoAmIRoom:
+        room = self._get_room(room_code)
+
+        if room.started:
+            raise ValueError("Character can only be changed in lobby.")
+        if player_id not in room.players:
+            raise PlayerNotFoundError("Player not found.")
+        if not re.fullmatch(r"char([1-9]|1[0-2])", character_id):
+            raise ValueError("Invalid character.")
+
+        room.players[player_id].character_id = character_id
         self.room_repository.save_room(room_code, self._serialize_room(room))
         return room
 
@@ -569,6 +595,7 @@ class WhoAmIService:
                 player_id: {
                     "id": player.id,
                     "name": player.name,
+                    "username": player.username,
                     "identity": player.identity,
                     "has_guessed_correctly": player.has_guessed_correctly,
                     "guess_count": player.guess_count,
@@ -605,6 +632,7 @@ class WhoAmIService:
             room.players[player_id] = WhoAmIPlayer(
                 id=player_data["id"],
                 name=player_data["name"],
+                username=player_data.get("username"),
                 identity=player_data.get("identity", ""),
                 has_guessed_correctly=player_data.get("has_guessed_correctly", False),
                 guess_count=player_data.get("guess_count", 0),

@@ -18,6 +18,11 @@ class JoinRoomRequest(BaseModel):
     player_name: str = Field(..., min_length=1, max_length=50)
     character_id: str = "char1"
 
+
+class UpdateCharacterRequest(BaseModel):
+    player_id: str
+    character_id: str
+
 class RevealIdentityRequest(BaseModel):
     """Request body for revealing the current player's identity."""
 
@@ -74,6 +79,7 @@ class PlayerView(BaseModel):
 
     id: str
     name: str
+    username: Optional[str] = None
     has_guessed_correctly: bool
     guess_count: int
     solved_order: Optional[int]

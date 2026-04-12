@@ -1,7 +1,9 @@
 """API routes for the Bluff game."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth.dependencies import get_current_user_optional
+from app.db.models.user import User
 from app.games.bluff.constants import BLUFF_CATEGORIES
 from app.games.bluff.schemas import (
     BluffAdvanceRoundRequest,
@@ -17,6 +19,7 @@ from app.games.bluff.schemas import (
     BluffSelectCategoryRequest,
     BluffSubmitAnswerRequest,
     BluffSubmitPickRequest,
+    BluffUpdateCharacterRequest,
     BluffUpdateCategoriesRequest,
 )
 from app.games.bluff.service import BluffGameService
@@ -55,6 +58,7 @@ def build_room_response(room) -> BluffRoomStateResponse:
             BluffPlayerView(
                 id=player.id,
                 name=player.name,
+                username=player.username,
                 character_id=player.character_id,
                 score=room.scores.get(player.id, 0),
             )
@@ -82,11 +86,15 @@ def get_categories():
 
 
 @router.post("/rooms", response_model=BluffRoomStateResponse)
-def create_room(payload: BluffCreateRoomRequest):
+def create_room(
+    payload: BluffCreateRoomRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+):
     """Create a new Bluff room."""
     try:
         room = service.create_room(
             host_name=payload.host_name,
+            auth_username=current_user.username if current_user else None,
             max_player_count=payload.max_player_count,
             total_rounds=payload.total_rounds,
             categories=payload.categories,
@@ -99,10 +107,29 @@ def create_room(payload: BluffCreateRoomRequest):
 
 
 @router.post("/rooms/{room_code}/join", response_model=BluffRoomStateResponse)
-def join_room(room_code: str, payload: BluffJoinRoomRequest):
+def join_room(
+    room_code: str,
+    payload: BluffJoinRoomRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+):
     """Join an existing Bluff room."""
     try:
-        room = service.join_room(room_code, payload.player_name, payload.character_id)
+        room = service.join_room(
+            room_code,
+            payload.player_name,
+            payload.character_id,
+            current_user.username if current_user else None,
+        )
+        return build_room_response(room)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rooms/{room_code}/character", response_model=BluffRoomStateResponse)
+def update_character(room_code: str, payload: BluffUpdateCharacterRequest):
+    """Update player character while in lobby."""
+    try:
+        room = service.update_character(room_code, payload.player_id, payload.character_id)
         return build_room_response(room)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

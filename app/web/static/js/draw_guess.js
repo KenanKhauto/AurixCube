@@ -13,6 +13,7 @@ let allDrawCategories = [];
 let selectedDrawLanguage = "en";
 let selectedDrawTimer = 60;
 let selectedDrawCharacter = localStorage.getItem("draw_character_id") || "char1";
+let drawFriendCachePrimed = false;
 
 let drawWS = null;
 let drawWSRoomCode = null;
@@ -51,6 +52,7 @@ const drawCategoryLabels = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
+    await primeDrawFriendCache();
     renderDrawPlayerCountButtons();
     renderDrawRoundsButtons();
     renderDrawLanguageButtons();
@@ -125,6 +127,92 @@ function buildDrawRemoveActionCell(playerId, showActions = true) {
         return `<td><button class="btn btn-danger" onclick="removeDrawPlayer('${playerId}')">حذف</button></td>`;
     }
     return "<td></td>";
+}
+
+function buildDrawLobbyActionCell(player) {
+    const actions = [];
+    if (drawIsHost && player.id !== currentDrawPlayerId) {
+        actions.push(`<button class="btn btn-danger" onclick="removeDrawPlayer('${player.id}')">حذف</button>`);
+    }
+    if (window.appCurrentUser && typeof canSendFriendRequestToUsername === "function" && canSendFriendRequestToUsername(player.username)) {
+        const encodedUsername = encodeURIComponent(player.username);
+        actions.push(`<button class="btn" onclick="sendDrawFriendRequest('${encodedUsername}', this)">Add Friend</button>`);
+    }
+    if (!actions.length) return "<td></td>";
+    return `<td>${actions.join(" ")}</td>`;
+}
+
+async function sendDrawFriendRequest(encodedUsername, buttonEl) {
+    const username = decodeURIComponent(encodedUsername || "");
+    if (!username || typeof sendFriendRequestByUsername !== "function") return;
+    if (buttonEl) buttonEl.disabled = true;
+    try {
+        const success = await sendFriendRequestByUsername(username);
+        if (success && buttonEl) {
+            buttonEl.textContent = "Requested";
+            buttonEl.classList.add("disabled");
+        } else if (buttonEl) {
+            buttonEl.disabled = false;
+        }
+    } catch (error) {
+        if (buttonEl) buttonEl.disabled = false;
+        console.error("Failed to send friend request:", error);
+    }
+}
+
+async function primeDrawFriendCache() {
+    if (drawFriendCachePrimed || !window.appCurrentUser || typeof ensureAppFriendCache !== "function") return;
+    await ensureAppFriendCache();
+    drawFriendCachePrimed = true;
+    if (currentDrawRoomData && (!currentDrawRoomData.started || currentDrawRoomData.phase === "waiting")) {
+        renderDrawWaitingRoom(currentDrawRoomData);
+    }
+}
+
+function renderDrawLobbyCharacterPicker(data) {
+    const grid = document.getElementById("drawWaitCharacterGrid");
+    const preview = document.getElementById("drawWaitCharacterPreview");
+    if (!grid || !preview) return;
+
+    const me = (data.players || []).find((player) => player.id === currentDrawPlayerId);
+    const activeCharacterId = me?.character_id || selectedDrawCharacter || "char1";
+    selectedDrawCharacter = activeCharacterId;
+    localStorage.setItem("draw_character_id", selectedDrawCharacter);
+
+    preview.src = `/static/images/${activeCharacterId}.png`;
+    grid.innerHTML = "";
+
+    drawCharacterOptions.forEach((characterId) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "character-btn";
+        button.dataset.characterId = characterId;
+        button.classList.toggle("active", characterId === activeCharacterId);
+        button.onclick = () => updateDrawLobbyCharacter(characterId);
+        button.innerHTML = `<img src="/static/images/${characterId}.png" class="character-btn-img" alt="${characterId}">`;
+        grid.appendChild(button);
+    });
+}
+
+async function updateDrawLobbyCharacter(characterId) {
+    if (!currentDrawRoomCode || !currentDrawPlayerId) return;
+    const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/character`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            player_id: currentDrawPlayerId,
+            character_id: characterId,
+        }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showDrawError(data.detail || "Unable to update character.");
+        return;
+    }
+    selectedDrawCharacter = characterId;
+    localStorage.setItem("draw_character_id", selectedDrawCharacter);
+    currentDrawRoomData = data;
+    renderDrawWaitingRoom(data);
 }
 
 function escapeHtml(value) {
@@ -1311,6 +1399,7 @@ function renderDrawWaitingRoom(data) {
     currentDrawRoomData = data;
     selectedDrawCategories = [...(data.categories || [])];
     document.getElementById("drawDisplayCode").textContent = data.room_code;
+    renderDrawLobbyCharacterPicker(data);
 
     const tbody = document.getElementById("drawPlayerList");
     tbody.innerHTML = "";
@@ -1322,7 +1411,7 @@ function renderDrawWaitingRoom(data) {
             row.innerHTML = `
                 <td>${buildDrawPlayerIdentity(player)}</td>
                 <td>${player.score}</td>
-                ${buildDrawRemoveActionCell(player.id)}
+                ${buildDrawLobbyActionCell(player)}
             `;
             tbody.appendChild(row);
         });

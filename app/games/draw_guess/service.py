@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import re
 import time
 import uuid
 from datetime import datetime
@@ -30,6 +31,7 @@ class DrawGuessGameService:
         self,
         host_name: str,
         character_id: str,
+        auth_username: str | None,
         max_player_count: int,
         total_rounds: int,
         categories: List[str],
@@ -56,6 +58,7 @@ class DrawGuessGameService:
         room.players[host_id] = DrawGuessPlayer(
             id=host_id,
             name=host_name,
+            username=auth_username,
             character_id=character_id,
         )
         room.scores[host_id] = 0
@@ -63,7 +66,7 @@ class DrawGuessGameService:
         self._save_room(room)
         return room
 
-    def join_room(self, room_code: str, player_name: str, character_id: str) -> DrawGuessRoom:
+    def join_room(self, room_code: str, player_name: str, character_id: str, auth_username: str | None) -> DrawGuessRoom:
         room = self._get_room(room_code)
 
         if room.ended:
@@ -78,6 +81,7 @@ class DrawGuessGameService:
         room.players[player_id] = DrawGuessPlayer(
             id=player_id,
             name=player_name,
+            username=auth_username,
             character_id=character_id,
         )
         room.scores[player_id] = 0
@@ -87,6 +91,20 @@ class DrawGuessGameService:
             # Add at a position so they get their turn eventually
             room.drawer_order.append(player_id)
 
+        self._save_room(room)
+        return room
+
+    def update_character(self, room_code: str, player_id: str, character_id: str) -> DrawGuessRoom:
+        room = self._get_room(room_code)
+
+        if room.started:
+            raise ValueError("Character can only be changed in lobby.")
+        if player_id not in room.players:
+            raise PlayerNotFoundError("Player not found.")
+        if not re.fullmatch(r"char([1-9]|1[0-2])", character_id):
+            raise ValueError("Invalid character.")
+
+        room.players[player_id].character_id = character_id
         self._save_room(room)
         return room
 
@@ -572,6 +590,7 @@ class DrawGuessGameService:
                 player_id: {
                     "id": player.id,
                     "name": player.name,
+                    "username": player.username,
                     "character_id": player.character_id,
                 }
                 for player_id, player in room.players.items()
@@ -649,6 +668,7 @@ class DrawGuessGameService:
             room.players[player_id] = DrawGuessPlayer(
                 id=player_data["id"],
                 name=player_data["name"],
+                username=player_data.get("username"),
                 character_id=player_data.get("character_id", "char1"),
             )
 

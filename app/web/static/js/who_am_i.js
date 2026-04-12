@@ -13,6 +13,7 @@ const MAX_CATEGORIES = 12;
 let selectedPlayerCount = null;
 let selectedCharacter = localStorage.getItem("whoami_character_id") || "char1";
 const whoAmICharacterOptions = Array.from({ length: 12 }, (_, i) => `char${i + 1}`);
+let whoAmIFriendCachePrimed = false;
 const playerCountOptions = [2, 3, 4, 5, 6, 7, 8];
 
 const categoryLabels = {
@@ -46,6 +47,7 @@ function hideWhoAmIError() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+    await primeWhoAmIFriendCache();
     renderPlayerCountButtons();
     await loadCategories();
     renderCharacterButtons();
@@ -196,6 +198,92 @@ function buildWhoAmIRemoveActionCell(playerId, showActions = true) {
         return `<td><button class="btn btn-danger" onclick="removeWhoAmIPlayer('${playerId}')">حذف</button></td>`;
     }
     return "<td></td>";
+}
+
+function buildWhoAmILobbyActionCell(player) {
+    const actions = [];
+    if (isHost && player.id !== currentPlayerId) {
+        actions.push(`<button class="btn btn-danger" onclick="removeWhoAmIPlayer('${player.id}')">حذف</button>`);
+    }
+    if (window.appCurrentUser && typeof canSendFriendRequestToUsername === "function" && canSendFriendRequestToUsername(player.username)) {
+        const encodedUsername = encodeURIComponent(player.username);
+        actions.push(`<button class="btn" onclick="sendWhoAmIFriendRequest('${encodedUsername}', this)">Add Friend</button>`);
+    }
+    if (!actions.length) return "<td></td>";
+    return `<td>${actions.join(" ")}</td>`;
+}
+
+async function sendWhoAmIFriendRequest(encodedUsername, buttonEl) {
+    const username = decodeURIComponent(encodedUsername || "");
+    if (!username || typeof sendFriendRequestByUsername !== "function") return;
+    if (buttonEl) buttonEl.disabled = true;
+    try {
+        const success = await sendFriendRequestByUsername(username);
+        if (success && buttonEl) {
+            buttonEl.textContent = "Requested";
+            buttonEl.classList.add("disabled");
+        } else if (buttonEl) {
+            buttonEl.disabled = false;
+        }
+    } catch (error) {
+        if (buttonEl) buttonEl.disabled = false;
+        console.error("Failed to send friend request:", error);
+    }
+}
+
+async function primeWhoAmIFriendCache() {
+    if (whoAmIFriendCachePrimed || !window.appCurrentUser || typeof ensureAppFriendCache !== "function") return;
+    await ensureAppFriendCache();
+    whoAmIFriendCachePrimed = true;
+    if (currentRoomData && (!currentRoomData.started || currentRoomData.phase === "waiting")) {
+        renderWaitingRoom(currentRoomData);
+    }
+}
+
+function renderWhoAmILobbyCharacterPicker(data) {
+    const grid = document.getElementById("whoamiWaitCharacterGrid");
+    const preview = document.getElementById("whoamiWaitCharacterPreview");
+    if (!grid || !preview) return;
+
+    const me = (data.players || []).find((player) => player.id === currentPlayerId);
+    const activeCharacterId = me?.character_id || selectedCharacter || "char1";
+    selectedCharacter = activeCharacterId;
+    localStorage.setItem("whoami_character_id", selectedCharacter);
+
+    preview.src = `/static/images/${activeCharacterId}.png`;
+    grid.innerHTML = "";
+
+    whoAmICharacterOptions.forEach((characterId) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "character-btn";
+        button.dataset.characterId = characterId;
+        button.classList.toggle("active", characterId === activeCharacterId);
+        button.onclick = () => updateWhoAmILobbyCharacter(characterId);
+        button.innerHTML = `<img src="/static/images/${characterId}.png" class="character-btn-img" alt="${characterId}">`;
+        grid.appendChild(button);
+    });
+}
+
+async function updateWhoAmILobbyCharacter(characterId) {
+    if (!currentRoomCode || !currentPlayerId) return;
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/character`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            player_id: currentPlayerId,
+            character_id: characterId,
+        }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "Unable to update character.");
+        return;
+    }
+    selectedCharacter = characterId;
+    localStorage.setItem("whoami_character_id", selectedCharacter);
+    currentRoomData = data;
+    renderWaitingRoom(data);
 }
 
 
@@ -1246,6 +1334,7 @@ function renderWaitingRoom(data) {
     selectedCategories = [...(data.categories || [])];
 
     document.getElementById("displayCode").textContent = data.room_code;
+    renderWhoAmILobbyCharacterPicker(data);
 
     const playerList = document.getElementById("playerList");
     const headerRow = playerList?.closest("table")?.querySelector("thead tr");
@@ -1257,14 +1346,15 @@ function renderWaitingRoom(data) {
             actionsHeader.id = "playerListActionsHeader";
             headerRow.appendChild(actionsHeader);
         }
-        actionsHeader.textContent = isHost ? "الإجراء" : "";
+        const showLobbyActions = isHost || Boolean(window.appCurrentUser);
+        actionsHeader.textContent = showLobbyActions ? "Actions" : "";
     }
 
     data.players.forEach((player) => {
         const row = document.createElement("tr");
         row.innerHTML = `
             <td>${buildWhoAmIPlayerIdentity(player)}</td>
-            ${buildWhoAmIRemoveActionCell(player.id)}
+            ${buildWhoAmILobbyActionCell(player)}
         `;
         playerList.appendChild(row);
     });

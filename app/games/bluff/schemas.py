@@ -20,6 +20,12 @@ class BluffJoinRoomRequest(BaseModel):
     player_name: str
     character_id: str = "char1"
 
+
+class BluffUpdateCharacterRequest(BaseModel):
+    player_id: str
+    character_id: str
+
+
 class BluffSelectCategoryRequest(BaseModel):
     player_id: str
     category: str
@@ -66,6 +72,7 @@ class BluffDeleteRoomRequest(BaseModel):
 class BluffPlayerView(BaseModel):
     id: str
     name: str
+    username: Optional[str] = None
     score: int
     character_id: str = "char1"
 

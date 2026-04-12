@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 class DrawGuessPlayer:
     id: str
     name: str
+    username: Optional[str] = None
     character_id: str = "char1"
     last_seen: datetime = field(default_factory=datetime.now)
 

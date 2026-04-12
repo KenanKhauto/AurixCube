@@ -1,7 +1,9 @@
 """API routes for the Who Am I game."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth.dependencies import get_current_user_optional
+from app.db.models.user import User
 from app.games.who_am_i.constants import CATEGORIES
 from app.games.who_am_i.schemas import (
     ConfirmRevealRequest,
@@ -16,6 +18,7 @@ from app.games.who_am_i.schemas import (
     RoomStateResponse,
     SubmitGuessRequest,
     UpdateCategoriesRequest,
+    UpdateCharacterRequest,
     RevealViewRequest,
     PlayerKnowledgeViewRequest,
 )
@@ -46,6 +49,7 @@ def build_room_response(room) -> RoomStateResponse:
             PlayerView(
                 id=player.id,
                 name=player.name,
+                username=player.username,
                 has_guessed_correctly=player.has_guessed_correctly,
                 guess_count=player.guess_count,
                 solved_order=player.solved_order,
@@ -63,11 +67,15 @@ def get_categories():
 
 
 @router.post("/rooms", response_model=RoomStateResponse)
-def create_room(payload: CreateRoomRequest):
+def create_room(
+    payload: CreateRoomRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+):
     """Create a new room."""
     try:
         room = service.create_room(
             host_name=payload.host_name,
+            auth_username=current_user.username if current_user else None,
             max_player_count=payload.max_player_count,
             categories=payload.categories,
             character_id=payload.character_id,
@@ -78,10 +86,29 @@ def create_room(payload: CreateRoomRequest):
 
 
 @router.post("/rooms/{room_code}/join", response_model=RoomStateResponse)
-def join_room(room_code: str, payload: JoinRoomRequest):
+def join_room(
+    room_code: str,
+    payload: JoinRoomRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+):
     """Join an existing room."""
     try:
-        room = service.join_room(room_code, payload.player_name, payload.character_id)
+        room = service.join_room(
+            room_code,
+            payload.player_name,
+            payload.character_id,
+            current_user.username if current_user else None,
+        )
+        return build_room_response(room)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/rooms/{room_code}/character", response_model=RoomStateResponse)
+def update_character(room_code: str, payload: UpdateCharacterRequest):
+    """Update player character while in lobby."""
+    try:
+        room = service.update_character(room_code, payload.player_id, payload.character_id)
         return build_room_response(room)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

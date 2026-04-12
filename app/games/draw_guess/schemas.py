@@ -22,6 +22,11 @@ class DrawGuessJoinRoomRequest(BaseModel):
     character_id: str = "char1"
 
 
+class DrawGuessUpdateCharacterRequest(BaseModel):
+    player_id: str
+    character_id: str
+
+
 class DrawGuessSelectWordRequest(BaseModel):
     player_id: str
     chosen_word_en: str
@@ -59,6 +64,7 @@ class DrawGuessUpdateCategoriesRequest(BaseModel):
 class DrawGuessPlayerView(BaseModel):
     id: str
     name: str
+    username: Optional[str] = None
     character_id: str
     score: int
 
