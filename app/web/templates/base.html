@@ -60,6 +60,11 @@
                     >
                     <div id="profileDropdown" class="profile-dropdown-menu hidden">
                         <a href="/profile">الملف الشخصي</a>
+                        <form method="post" action="/logout" class="profile-dropdown-logout-form">
+                            <button type="submit" class="profile-dropdown-logout-btn">
+                                تسجيل الخروج
+                            </button>
+                        </form>
                     </div>
                 </div>
             {% else %}
