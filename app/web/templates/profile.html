@@ -7,40 +7,6 @@
     <h1 style="color:var(--primary); text-shadow: var(--glow);">الملف الشخصي</h1>
     <p style="color:#aaa;">يمكنك تعديل بيانات الحساب وصورة الملف من هنا.</p>
 
-    <div class="profile-box">
-        <div class="profile-row">
-            <span class="profile-label">اسم المستخدم:</span>
-            <span class="profile-value" id="profileCurrentUsername">{{ current_user.username }}</span>
-        </div>
-
-        <div class="profile-row">
-            <span class="profile-label">الاسم الظاهر:</span>
-            <span class="profile-value" id="profileCurrentDisplayName">{{ current_user.display_name or "-" }}</span>
-        </div>
-
-        <div class="profile-row">
-            <span class="profile-label">صورة الملف:</span>
-            <span class="profile-value">
-                <img
-                    id="profileSummaryAvatar"
-                    src="/static/images/{{ current_user.profile_image or 'profile_img_default.png' }}"
-                    class="profile-summary-avatar"
-                    alt="Profile Image"
-                >
-            </span>
-        </div>
-
-        <div class="profile-row">
-            <span class="profile-label">البريد الإلكتروني:</span>
-            <span class="profile-value" id="profileCurrentEmail">{{ current_user.email or "-" }}</span>
-        </div>
-
-        <div class="profile-row">
-            <span class="profile-label">رقم المستخدم:</span>
-            <span class="profile-value">{{ current_user.id }}</span>
-        </div>
-    </div>
-
     <div class="profile-box profile-edit-box" style="margin-top: 20px;">
         <div class="profile-social-header">
             <div>
@@ -52,11 +18,13 @@
         <form id="profile-edit-form" class="profile-edit-form" enctype="multipart/form-data">
             <div class="profile-edit-grid">
                 <div class="profile-image-editor">
+                    {% set profile_preview_image = current_user.profile_image or 'profile_img_default.png' %}
                     <img
                         id="profileEditPreview"
-                        src="/static/images/{{ current_user.profile_image or 'profile_img_default.png' }}"
+                        src="{% if profile_preview_image.startswith('http://') or profile_preview_image.startswith('https://') or profile_preview_image.startswith('/') %}{{ profile_preview_image }}{% else %}/static/images/{{ profile_preview_image }}{% endif %}"
                         class="profile-edit-preview"
                         alt="Profile Preview"
+                        onerror="this.onerror=null;this.src='/static/images/profile_img_default.png';"
                     >
                     <label class="profile-upload-label" for="profile-image-input">اختر صورة جديدة</label>
                     <input id="profile-image-input" type="file" name="profile_image" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
@@ -146,24 +114,33 @@ function getProfileDisplayName(user) {
 }
 
 function updateProfileSummary(user) {
-    document.getElementById("profileCurrentUsername").textContent = user.username;
-    document.getElementById("profileCurrentDisplayName").textContent = user.display_name || "-";
-    document.getElementById("profileCurrentEmail").textContent = user.email || "-";
+    const currentUsername = document.getElementById("profileCurrentUsername");
+    const currentDisplayName = document.getElementById("profileCurrentDisplayName");
+    const currentEmail = document.getElementById("profileCurrentEmail");
+    if (currentUsername) currentUsername.textContent = user.username;
+    if (currentDisplayName) currentDisplayName.textContent = user.display_name || "-";
+    if (currentEmail) currentEmail.textContent = user.email || "-";
 
-    const avatarPath = `/static/images/${user.profile_image || "profile_img_default.png"}`;
+    const avatarPath = resolveProfileImageUrl(user.profile_image);
     const summaryAvatar = document.getElementById("profileSummaryAvatar");
     const editPreview = document.getElementById("profileEditPreview");
-    if (summaryAvatar) summaryAvatar.src = avatarPath;
-    if (editPreview) editPreview.src = avatarPath;
+    if (summaryAvatar) {
+        summaryAvatar.src = avatarPath;
+        summaryAvatar.onerror = () => handleProfileImageError(summaryAvatar);
+    }
+    if (editPreview) {
+        editPreview.src = avatarPath;
+        editPreview.onerror = () => handleProfileImageError(editPreview);
+    }
 }
 
 function buildProfileUserRow(user, actionsHtml = "") {
-    const profileImage = user.profile_image || "profile_img_default.png";
+    const profileImage = resolveProfileImageUrl(user.profile_image);
     return `
         <tr>
             <td>
                 <div class="profile-friend-cell">
-                    <img src="/static/images/${escapeProfileHtml(profileImage)}" class="profile-friend-avatar" alt="${escapeProfileHtml(getProfileDisplayName(user))}">
+                    <img src="${escapeProfileHtml(profileImage)}" class="profile-friend-avatar" alt="${escapeProfileHtml(getProfileDisplayName(user))}" onerror="handleProfileImageError(this)">
                     <div class="profile-friend-meta">
                         <span class="profile-friend-name">${escapeProfileHtml(getProfileDisplayName(user))}</span>
                         <span class="profile-friend-username">@${escapeProfileHtml(user.username)}</span>

@@ -26,6 +26,25 @@ pip install -r requirements.txt
 python run.py
 ```
 
+## Profile Image Storage
+
+Profile images support two backends:
+
+- `local` (default): stores files on disk.
+- `s3`: stores files in an S3 bucket.
+
+Environment variables:
+
+- `PROFILE_IMAGE_STORAGE_BACKEND=local|s3`
+- `PROFILE_IMAGE_LOCAL_DIR` (used when backend is `local`)
+- `PROFILE_IMAGE_LOCAL_BASE_URL` (used when backend is `local`)
+- `PROFILE_IMAGE_S3_BUCKET` (required when backend is `s3`)
+- `PROFILE_IMAGE_S3_REGION`
+- `PROFILE_IMAGE_S3_PREFIX`
+- `PROFILE_IMAGE_S3_PUBLIC_BASE_URL` (optional CDN/base URL)
+
+`docker-compose.yml` is configured with a named volume for local profile uploads so images survive container restarts/redeploys.
+
 ## License
 
 AurixCube Proprietary License v1.0

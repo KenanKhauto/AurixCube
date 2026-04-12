@@ -10,6 +10,11 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://arcadia:arcadia123@postgres:5432/arcadiadb
       REDIS_URL: redis://redis:6379/0
+      PROFILE_IMAGE_STORAGE_BACKEND: local
+      PROFILE_IMAGE_LOCAL_DIR: /app/app/web/static/images/profile_uploads
+      PROFILE_IMAGE_LOCAL_BASE_URL: /static/images/profile_uploads
+    volumes:
+      - profile_uploads_data:/app/app/web/static/images/profile_uploads
     expose:
       - "8000"
 
@@ -44,3 +49,4 @@ services:
 
 volumes:
   postgres_data:
+  profile_uploads_data:

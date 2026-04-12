@@ -1,19 +1,20 @@
 """Authentication service layer."""
 
-from pathlib import Path
-import uuid
-
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.auth.schemas import FriendRequest, RegisterRequest
+from app.auth.profile_image_storage import (
+    ALLOWED_PROFILE_IMAGE_EXTENSIONS,
+    MAX_PROFILE_IMAGE_BYTES,
+    LocalProfileImageStorage,
+    S3ProfileImageStorage,
+)
+from app.auth.schemas import RegisterRequest
 from app.auth.security import hash_password, verify_password
+from app.config import settings
 from app.db.models.friend import Friend
 from app.db.models.game_invite import GameInvite
 from app.db.models.user import User
-
-PROFILE_UPLOAD_DIR = Path("app/web/static/images/profile_uploads")
-PROFILE_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 GAME_INVITE_PATHS = {
     "bluff": "/games/bluff",
@@ -27,6 +28,26 @@ class AuthService:
     """
     Service layer for authentication-related business logic.
     """
+    def __init__(self):
+        self.profile_image_storage = self._build_profile_image_storage()
+
+    def _build_profile_image_storage(self):
+        backend = (settings.profile_image_storage_backend or "local").lower()
+        if backend == "local":
+            return LocalProfileImageStorage(
+                upload_dir=settings.profile_image_local_dir,
+                public_base_url=settings.profile_image_local_base_url,
+            )
+        if backend == "s3":
+            if not settings.profile_image_s3_bucket:
+                raise ValueError("PROFILE_IMAGE_S3_BUCKET is required when PROFILE_IMAGE_STORAGE_BACKEND=s3.")
+            return S3ProfileImageStorage(
+                bucket=settings.profile_image_s3_bucket,
+                region=settings.profile_image_s3_region,
+                prefix=settings.profile_image_s3_prefix,
+                public_base_url=settings.profile_image_s3_public_base_url or None,
+            )
+        raise ValueError(f"Unsupported PROFILE_IMAGE_STORAGE_BACKEND: {backend}")
 
     def get_user_by_id(self, db: Session, user_id: int) -> User | None:
         """
@@ -177,24 +198,25 @@ class AuthService:
 
     def _store_profile_image(self, user: User, image_bytes: bytes, extension: str) -> str:
         extension = extension.lower()
-        if extension not in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
+        if extension not in ALLOWED_PROFILE_IMAGE_EXTENSIONS:
             raise ValueError("Unsupported image format.")
 
-        if len(image_bytes) > 5 * 1024 * 1024:
+        if len(image_bytes) > MAX_PROFILE_IMAGE_BYTES:
             raise ValueError("Profile image must be 5 MB or smaller.")
 
-        filename = f"user_{user.id}_{uuid.uuid4().hex}{extension}"
-        relative_path = f"profile_uploads/{filename}"
-        file_path = PROFILE_UPLOAD_DIR / filename
-        file_path.write_bytes(image_bytes)
-
-        old_image = user.profile_image or ""
-        if old_image.startswith("profile_uploads/"):
-            old_path = Path("app/web/static/images") / old_image
-            if old_path.exists() and old_path.is_file():
-                old_path.unlink()
-
-        return relative_path
+        try:
+            return self.profile_image_storage.store(
+                user_id=user.id,
+                image_bytes=image_bytes,
+                extension=extension,
+                old_image=user.profile_image,
+            )
+        except ValueError:
+            raise
+        except OSError as exc:
+            raise ValueError("Unable to save profile image on server storage.") from exc
+        except Exception as exc:
+            raise ValueError("Unable to save profile image on server storage.") from exc
 
     def add_friend(self, db: Session, user_id: int, friend_username: str) -> None:
         """

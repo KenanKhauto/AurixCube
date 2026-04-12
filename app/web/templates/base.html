@@ -50,7 +50,14 @@
                     <i class="fa-solid fa-bell"></i>
                 </button>
                 <div class="profile-dropdown">
-                    <img src="/static/images/{{ current_user.profile_image or 'profile_img_default.png' }}" class="nav-img profile-trigger" alt="Profile" onclick="toggleProfileDropdown()">
+                    {% set nav_profile_image = current_user.profile_image or 'profile_img_default.png' %}
+                    <img
+                        src="{% if nav_profile_image.startswith('http://') or nav_profile_image.startswith('https://') or nav_profile_image.startswith('/') %}{{ nav_profile_image }}{% else %}/static/images/{{ nav_profile_image }}{% endif %}"
+                        class="nav-img profile-trigger"
+                        alt="Profile"
+                        onclick="toggleProfileDropdown()"
+                        onerror="this.onerror=null;this.src='/static/images/profile_img_default.png';"
+                    >
                     <div id="profileDropdown" class="profile-dropdown-menu hidden">
                         <a href="/profile">الملف الشخصي</a>
                     </div>
@@ -150,6 +157,29 @@ null
 <script>
 const appCurrentUserDataEl = document.getElementById("appCurrentUserData");
 window.appCurrentUser = appCurrentUserDataEl ? JSON.parse(appCurrentUserDataEl.textContent) : null;
+const DEFAULT_PROFILE_IMAGE_URL = "/static/images/profile_img_default.png";
+
+function resolveProfileImageUrl(profileImage) {
+    const value = String(profileImage || "").trim();
+    if (!value) return DEFAULT_PROFILE_IMAGE_URL;
+
+    if (
+        value.startsWith("http://") ||
+        value.startsWith("https://") ||
+        value.startsWith("//") ||
+        value.startsWith("/")
+    ) {
+        return value;
+    }
+
+    return `/static/images/${value.replace(/^\/+/, "")}`;
+}
+
+function handleProfileImageError(imgEl) {
+    if (!imgEl) return;
+    imgEl.onerror = null;
+    imgEl.src = DEFAULT_PROFILE_IMAGE_URL;
+}
 
 function toggleMenu() {
     document.getElementById("mobileMenu").classList.toggle("hidden");
@@ -374,7 +404,7 @@ function buildInviteNotificationCard(invite) {
 
     wrapper.innerHTML = `
         <div class="app-list-card-main">
-            <img src="/static/images/${invite.sender.profile_image || 'profile_img_default.png'}" class="app-list-avatar" alt="${senderName}">
+            <img src="${resolveProfileImageUrl(invite.sender.profile_image)}" class="app-list-avatar" alt="${senderName}" onerror="handleProfileImageError(this)">
             <div class="app-list-meta">
                 <div class="app-list-title">${senderName}</div>
                 <div class="app-list-subtitle">دعاك للانضمام إلى ${gameNames[invite.game_key] || invite.game_key}</div>
@@ -449,7 +479,7 @@ async function openInviteFriendsModal(gameKey, roomCode) {
             const friendName = friend.display_name || friend.username;
             card.innerHTML = `
                 <div class="app-list-card-main">
-                    <img src="/static/images/${friend.profile_image || 'profile_img_default.png'}" class="app-list-avatar" alt="${friendName}">
+                    <img src="${resolveProfileImageUrl(friend.profile_image)}" class="app-list-avatar" alt="${friendName}" onerror="handleProfileImageError(this)">
                     <div class="app-list-meta">
                         <div class="app-list-title">${friendName}</div>
                         <div class="app-list-subtitle">@${friend.username}</div>

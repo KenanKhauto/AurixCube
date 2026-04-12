@@ -12,3 +12,4 @@ psycopg[binary]
 redis
 rapidfuzz
 uvicorn[standard]
+boto3

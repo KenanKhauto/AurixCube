@@ -779,9 +779,19 @@ textarea:focus {
     background: rgba(255, 255, 255, 0.03);
 }
 
-.correct-answer-row {
-    background: var(--game-accent-soft);
-    border-right: 3px solid var(--game-accent);
+.correct-answer-row td {
+    background: linear-gradient(180deg, rgba(42, 136, 96, 0.42), rgba(26, 84, 59, 0.34));
+    color: #e9fff3;
+    font-weight: 700;
+    border-bottom-color: rgba(88, 205, 149, 0.45);
+}
+
+.correct-answer-row td:first-child {
+    border-right: 3px solid #58cd95;
+}
+
+.correct-answer-row:hover td {
+    background: linear-gradient(180deg, rgba(48, 150, 106, 0.5), rgba(31, 95, 66, 0.42));
 }
 
 .podium-gold {
