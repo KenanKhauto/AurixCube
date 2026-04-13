@@ -52,8 +52,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadCategories();
     renderCharacterButtons();
 
-    if (currentPlayerName) {
-        document.getElementById("pName").value = currentPlayerName;
+    const nameInput = document.getElementById("pName");
+    const defaultLobbyName = typeof getDefaultLobbyName === "function" ? getDefaultLobbyName() : "";
+    const initialName = currentPlayerName || defaultLobbyName;
+    if (nameInput && defaultLobbyName) {
+        nameInput.placeholder = defaultLobbyName;
+    }
+    if (nameInput && initialName && !nameInput.value.trim()) {
+        nameInput.value = initialName;
     }
 
     if (currentRoomCode) {

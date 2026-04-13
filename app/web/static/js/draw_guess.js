@@ -60,9 +60,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderDrawCharacterButtons();
     await loadDrawCategories();
 
-    if (currentDrawPlayerName) {
-        const nameInput = document.getElementById("drawName");
-        if (nameInput) nameInput.value = currentDrawPlayerName;
+    const nameInput = document.getElementById("drawName");
+    const defaultLobbyName = typeof getDefaultLobbyName === "function" ? getDefaultLobbyName() : "";
+    const initialName = currentDrawPlayerName || defaultLobbyName;
+    if (nameInput && defaultLobbyName) {
+        nameInput.placeholder = defaultLobbyName;
+    }
+    if (nameInput && initialName && !nameInput.value.trim()) {
+        nameInput.value = initialName;
     }
 
     if (currentDrawRoomCode) {

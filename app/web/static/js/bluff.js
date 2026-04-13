@@ -187,9 +187,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderBluffCharacterButtons();
     renderBluffRoundTimerButtons();
 
-    if (currentBluffPlayerName) {
-        const nameInput = document.getElementById("bluffName");
-        if (nameInput) nameInput.value = currentBluffPlayerName;
+    const nameInput = document.getElementById("bluffName");
+    const defaultLobbyName = typeof getDefaultLobbyName === "function" ? getDefaultLobbyName() : "";
+    const initialName = currentBluffPlayerName || defaultLobbyName;
+    if (nameInput && defaultLobbyName) {
+        nameInput.placeholder = defaultLobbyName;
+    }
+    if (nameInput && initialName && !nameInput.value.trim()) {
+        nameInput.value = initialName;
     }
 
     if (currentBluffRoomCode) {
@@ -1194,6 +1199,7 @@ function renderBluffAnswersResultTable(data) {
     if (!tbody) return;
 
     tbody.innerHTML = "";
+    const picks = data.picks || {};
 
     (data.answer_options || []).forEach((option) => {
         const row = document.createElement("tr");
@@ -1207,6 +1213,14 @@ function renderBluffAnswersResultTable(data) {
                 .join(" / ")
             : "الإجابة الصحيحة";
 
+        const pickerNames = Object.entries(picks)
+            .filter(([, optionId]) => optionId === option.id)
+            .map(([playerId]) => {
+                const player = data.players.find((p) => p.id === playerId);
+                return player ? player.name : "لاعب غير معروف";
+            })
+            .join(" / ") || "-";
+
 
         if (option.id === data.last_round_correct_option_id) {
             row.classList.add("correct-answer-row");
@@ -1216,6 +1230,7 @@ function renderBluffAnswersResultTable(data) {
             <td>${escapeHtml(option.text)}</td>
             <td>${escapeHtml(authorNames)}</td>
             <td>${option.votes_received ?? 0}</td>
+            <td>${escapeHtml(pickerNames)}</td>
         `;
 
         tbody.appendChild(row);

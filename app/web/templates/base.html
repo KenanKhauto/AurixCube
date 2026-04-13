@@ -165,6 +165,12 @@ const appCurrentUserDataEl = document.getElementById("appCurrentUserData");
 window.appCurrentUser = appCurrentUserDataEl ? JSON.parse(appCurrentUserDataEl.textContent) : null;
 const DEFAULT_PROFILE_IMAGE_URL = "/static/images/profile_img_default.png";
 
+function getDefaultLobbyName() {
+    const displayName = String(window.appCurrentUser?.display_name || "").trim();
+    if (displayName) return displayName;
+    return String(window.appCurrentUser?.username || "").trim();
+}
+
 function resolveProfileImageUrl(profileImage) {
     const value = String(profileImage || "").trim();
     if (!value) return DEFAULT_PROFILE_IMAGE_URL;

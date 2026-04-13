@@ -105,11 +105,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderUndercoverCountButtons();
     await loadCategories();
 
-    if (currentPlayerName) {
-        const nameInput = document.getElementById("pName");
-        if (nameInput) {
-            nameInput.value = currentPlayerName;
-        }
+    const nameInput = document.getElementById("pName");
+    const defaultLobbyName = typeof getDefaultLobbyName === "function" ? getDefaultLobbyName() : "";
+    const initialName = currentPlayerName || defaultLobbyName;
+    if (nameInput && defaultLobbyName) {
+        nameInput.placeholder = defaultLobbyName;
+    }
+    if (nameInput && initialName && !nameInput.value.trim()) {
+        nameInput.value = initialName;
     }
 
     if (currentRoomCode) {
