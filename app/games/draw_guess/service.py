@@ -208,6 +208,7 @@ class DrawGuessGameService:
         room.winner_ids = []
         room.current_round = 1
         room.drawer_order = list(room.players.keys())
+        random.shuffle(room.drawer_order)
 
         for player_id in room.players:
             room.scores[player_id] = 0

@@ -52,6 +52,7 @@ def build_room_response(room) -> RoomStateResponse:
                 username=player.username,
                 has_guessed_correctly=player.has_guessed_correctly,
                 guess_count=player.guess_count,
+                latest_guess_text=player.latest_guess_text,
                 solved_order=player.solved_order,
                 character_id=player.character_id,
             )

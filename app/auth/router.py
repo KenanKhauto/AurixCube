@@ -1,8 +1,9 @@
 """Authentication routes."""
 
 from pathlib import Path
+import asyncio
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -135,22 +136,6 @@ def logout_user(request: Request):
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 
-@router.post("/friends")
-def add_friend(
-    friend_username: str = Form(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """
-    Add a friend.
-    """
-    try:
-        auth_service.add_friend(db, current_user.id, friend_username)
-        return {"message": "Friend request sent successfully."}
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
 @router.post("/profile", response_model=ProfileUpdateResponse)
 async def update_profile(
     username: str = Form(...),
@@ -214,6 +199,34 @@ def get_friends(
     return [UserResponse.model_validate(friend) for friend in friends]
 
 
+@router.post("/friends")
+def send_friend_request(
+    background_tasks: BackgroundTasks,
+    friend_username: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Send a friend request.
+    """
+    try:
+        auth_service.add_friend(db, current_user.id, friend_username)
+        friend = auth_service.get_user_by_username(db, friend_username)
+        if friend:
+            invites = auth_service.get_game_invites(db, friend.id)
+            friend_requests = auth_service.get_pending_requests(db, friend.id)
+            pending_invites = [invite for invite in invites if invite.status == "pending"]
+            total_count = len(pending_invites) + len(friend_requests)
+            background_tasks.add_task(
+                notify_user,
+                friend.id,
+                {"type": "notification_count", "count": total_count},
+            )
+        return {"message": "Friend request sent."}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get("/invites", response_model=list[GameInviteResponse])
 def get_game_invites(
     current_user: User = Depends(get_current_user),
@@ -227,6 +240,7 @@ def get_game_invites(
 @router.post("/invites", response_model=GameInviteResponse)
 def send_game_invite(
     payload: SendGameInviteRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -238,6 +252,15 @@ def send_game_invite(
             recipient_id=payload.recipient_id,
             game_key=payload.game_key,
             room_code=payload.room_code,
+        )
+        invites = auth_service.get_game_invites(db, payload.recipient_id)
+        friend_requests = auth_service.get_pending_requests(db, payload.recipient_id)
+        pending_invites = [inv for inv in invites if inv.status == "pending"]
+        total_count = len(pending_invites) + len(friend_requests)
+        background_tasks.add_task(
+            notify_user,
+            payload.recipient_id,
+            {"type": "notification_count", "count": total_count},
         )
         return _serialize_game_invite(invite)
     except ValueError as exc:
@@ -311,3 +334,56 @@ def decline_friend_request(
         return {"message": "Friend request declined."}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# WebSocket for real-time notifications
+from fastapi import WebSocket, WebSocketDisconnect
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Simple notification manager (in production, use Redis or similar)
+notification_connections: dict[int, WebSocket] = {}
+
+@router.websocket("/ws/notifications")
+async def notification_websocket(websocket: WebSocket, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """WebSocket endpoint for real-time notifications."""
+    await websocket.accept()
+    notification_connections[current_user.id] = websocket
+    logger.info("Notification WS connected user=%s", current_user.username)
+
+    try:
+        # Send initial notification count
+        invites = auth_service.get_game_invites(db, current_user.id)
+        friend_requests = auth_service.get_pending_requests(db, current_user.id)
+        pending_invites = [invite for invite in invites if invite.status == "pending"]
+        total_count = len(pending_invites) + len(friend_requests)
+
+        await websocket.send_json({
+            "type": "notification_count",
+            "count": total_count
+        })
+
+        while True:
+            # Keep connection alive, wait for client messages if needed
+            data = await websocket.receive_text()
+            # For now, just keep alive
+
+    except WebSocketDisconnect:
+        logger.info("Notification WS disconnected user=%s", current_user.username)
+    finally:
+        if current_user.id in notification_connections:
+            del notification_connections[current_user.id]
+
+
+async def notify_user(user_id: int, message: dict):
+    """Send notification to a specific user if connected."""
+    if user_id in notification_connections:
+        try:
+            await notification_connections[user_id].send_json(message)
+        except Exception as e:
+            logger.warning("Failed to send notification to user %s: %s", user_id, e)
+            # Remove broken connection
+            if user_id in notification_connections:
+                del notification_connections[user_id]

@@ -1169,6 +1169,15 @@ textarea:focus {
     border-radius: 16px;
 }
 
+.app-list-section-header {
+    color: var(--brand-gold-strong);
+    font-weight: 700;
+    font-size: 16px;
+    margin: 8px 0 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(214, 176, 106, 0.2);
+}
+
 /* ================= RESPONSIVE ================= */
 
 @media (max-width: 768px) {

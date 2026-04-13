@@ -182,6 +182,7 @@ class BluffGameService:
         room.winner_ids = []
         room.current_round = 1
         room.chooser_order = list(room.players.keys())
+        random.shuffle(room.chooser_order)
         room.used_prompt_keys = []
 
         for player_id in room.players:

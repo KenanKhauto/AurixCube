@@ -224,6 +224,7 @@ class WhoAmIService:
             player.identity = identities_pool[index]["label"]
             player.has_guessed_correctly = False
             player.guess_count = 0
+            player.latest_guess_text = ""
             player.solved_order = None
 
         reveal_order = list(room.players.keys())
@@ -356,6 +357,7 @@ class WhoAmIService:
             raise ValueError("Player has already guessed correctly.")
 
         player.guess_count += 1
+        player.latest_guess_text = guess_text.strip()
 
         all_entries = []
         for category in room.categories:
@@ -417,6 +419,7 @@ class WhoAmIService:
             player.identity = ""
             player.has_guessed_correctly = False
             player.guess_count = 0
+            player.latest_guess_text = ""
             player.solved_order = None
 
         self.room_repository.save_room(room_code, self._serialize_room(room))
@@ -599,6 +602,7 @@ class WhoAmIService:
                     "identity": player.identity,
                     "has_guessed_correctly": player.has_guessed_correctly,
                     "guess_count": player.guess_count,
+                    "latest_guess_text": player.latest_guess_text,
                     "solved_order": player.solved_order,
                     "character_id": player.character_id,
                 }
@@ -636,6 +640,7 @@ class WhoAmIService:
                 identity=player_data.get("identity", ""),
                 has_guessed_correctly=player_data.get("has_guessed_correctly", False),
                 guess_count=player_data.get("guess_count", 0),
+                latest_guess_text=player_data.get("latest_guess_text", ""),
                 solved_order=player_data.get("solved_order"),
                 character_id=player_data.get("character_id", "char1")
             )
@@ -671,6 +676,7 @@ class WhoAmIService:
                 "id": player.id,
                 "name": player.name,
                 "guess_count": player.guess_count,
+                "latest_guess_text": player.latest_guess_text,
                 "has_guessed_correctly": player.has_guessed_correctly,
                 "solved_order": player.solved_order,
                 "visible_identity": visible_identity,

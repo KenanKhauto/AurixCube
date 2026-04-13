@@ -1,6 +1,9 @@
 
 --- Resolution on mobile is not working properly
 
---- bluff, we want to see who submitted which answer it should be shown on the table..
+--- fix draw guess new round, erase the white board.
+--- work on a recommender system for letters with time.
+--- add new categories, what is the country. with the images.
 
---- in bluff, the correct answer should show as green.
+--- when you invite players in the frontend and the invite goes, it should change the button to invited. And make a time until it goes back.
+ANd the popup of you invited this player successfully should go away. 

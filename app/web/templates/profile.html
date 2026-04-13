@@ -282,6 +282,7 @@ async function acceptRequest(requesterId) {
                 title: "تم التحديث",
                 confirmLabel: "حسناً",
             });
+            if (window.updateNotificationBadge) await window.updateNotificationBadge();
             return;
         }
 
@@ -309,6 +310,7 @@ async function declineRequest(requesterId) {
                 title: "تم التحديث",
                 confirmLabel: "حسناً",
             });
+            if (window.updateNotificationBadge) await window.updateNotificationBadge();
             return;
         }
 

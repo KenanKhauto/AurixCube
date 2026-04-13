@@ -82,6 +82,7 @@ class PlayerView(BaseModel):
     username: Optional[str] = None
     has_guessed_correctly: bool
     guess_count: int
+    latest_guess_text: str
     solved_order: Optional[int]
     character_id: str = "char1"
 

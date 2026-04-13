@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AurixCube</title>
-    <link rel="icon" type="image/x-icon" href="static/images/main_logo.png">
+    <link rel="icon" type="image/x-icon" href="/static/images/main_logo.png">
     <link rel="stylesheet" href="/static/css/style.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
@@ -46,8 +46,9 @@
         <!-- RIGHT -->
         <div class="nav-right">
             {% if current_user %}
-                <button type="button" class="nav-action-btn nav-game-requests-btn" onclick="showGameRequests()" aria-label="طلبات اللعب" title="طلبات اللعب">
+                <button type="button" class="nav-action-btn nav-game-requests-btn" onclick="showGameRequests()" aria-label="الإشعارات" title="الإشعارات">
                     <i class="fa-solid fa-bell"></i>
+                    <span id="notificationBadge" class="notification-badge hidden">0</span>
                 </button>
                 <div class="profile-dropdown">
                     {% set nav_profile_image = current_user.profile_image or 'profile_img_default.png' %}
@@ -164,6 +165,12 @@ const appCurrentUserDataEl = document.getElementById("appCurrentUserData");
 window.appCurrentUser = appCurrentUserDataEl ? JSON.parse(appCurrentUserDataEl.textContent) : null;
 const DEFAULT_PROFILE_IMAGE_URL = "/static/images/profile_img_default.png";
 
+function getDefaultLobbyName() {
+    const displayName = String(window.appCurrentUser?.display_name || "").trim();
+    if (displayName) return displayName;
+    return String(window.appCurrentUser?.username || "").trim();
+}
+
 function resolveProfileImageUrl(profileImage) {
     const value = String(profileImage || "").trim();
     if (!value) return DEFAULT_PROFILE_IMAGE_URL;
@@ -188,6 +195,8 @@ function handleProfileImageError(imgEl) {
 
 let appFriendUsernames = new Set();
 let appFriendCachePromise = null;
+const inviteCooldownUntilByFriendId = new Map();
+const INVITE_BUTTON_COOLDOWN_SECONDS = 30;
 
 async function ensureAppFriendCache() {
     if (!window.appCurrentUser) return appFriendUsernames;
@@ -504,24 +513,122 @@ function buildInviteNotificationCard(invite) {
     return wrapper;
 }
 
-async function loadGameRequestsPanel() {
-    const response = await fetch("/invites");
-    const invites = response.ok ? await response.json() : [];
+function applyInviteButtonCooldown(buttonEl, friendId) {
+    if (!buttonEl) return;
+
+    const tick = () => {
+        const cooldownUntil = inviteCooldownUntilByFriendId.get(friendId) || 0;
+        const remainingSeconds = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
+
+        if (remainingSeconds <= 0) {
+            inviteCooldownUntilByFriendId.delete(friendId);
+            buttonEl.disabled = false;
+            buttonEl.textContent = "دعوة";
+            return false;
+        }
+
+        buttonEl.disabled = true;
+        buttonEl.textContent = `Invited (${remainingSeconds}s)`;
+        return true;
+    };
+
+    if (!tick()) return;
+
+    const intervalId = setInterval(() => {
+        if (!document.body.contains(buttonEl)) {
+            clearInterval(intervalId);
+            return;
+        }
+        if (!tick()) {
+            clearInterval(intervalId);
+        }
+    }, 1000);
+}
+
+function buildFriendRequestNotificationCard(user) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "app-list-card";
+
+    const userName = user.display_name || user.username;
+
+    wrapper.innerHTML = `
+        <div class="app-list-card-main">
+            <img src="${resolveProfileImageUrl(user.profile_image)}" class="app-list-avatar" alt="${userName}" onerror="handleProfileImageError(this)">
+            <div class="app-list-meta">
+                <div class="app-list-title">${userName}</div>
+                <div class="app-list-subtitle">أرسل لك طلب صداقة</div>
+                <div class="app-list-footnote">@${user.username}</div>
+            </div>
+        </div>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "app-list-actions";
+
+    const acceptBtn = document.createElement("button");
+    acceptBtn.type = "button";
+    acceptBtn.className = "btn btn-primary app-list-action-btn";
+    acceptBtn.textContent = "قبول";
+    acceptBtn.onclick = () => respondToFriendRequest(user.id, "accept");
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "btn app-list-action-btn";
+    rejectBtn.textContent = "رفض";
+    rejectBtn.onclick = () => respondToFriendRequest(user.id, "decline");
+
+    actions.appendChild(acceptBtn);
+    actions.appendChild(rejectBtn);
+    wrapper.appendChild(actions);
+
+    return wrapper;
+}
+
+async function loadNotificationsPanel() {
+    const [invitesResponse, requestsResponse] = await Promise.all([
+        fetch("/invites"),
+        fetch("/friends/requests")
+    ]);
+
+    const invites = invitesResponse.ok ? await invitesResponse.json() : [];
+    const friendRequests = requestsResponse.ok ? await requestsResponse.json() : [];
 
     const body = document.createElement("div");
     body.className = "app-list";
 
-    if (!invites.length) {
-        const empty = document.createElement("div");
-        empty.className = "app-list-empty";
-        empty.textContent = "لا توجد دعوات لعب حالياً.";
-        body.appendChild(empty);
-    } else {
+    let hasContent = false;
+
+    // Add friend requests section
+    if (friendRequests.length > 0) {
+        hasContent = true;
+        const requestsHeader = document.createElement("div");
+        requestsHeader.className = "app-list-section-header";
+        requestsHeader.textContent = "طلبات الصداقة";
+        body.appendChild(requestsHeader);
+
+        friendRequests.forEach((user) => body.appendChild(buildFriendRequestNotificationCard(user)));
+    }
+
+    // Add game invites section
+    if (invites.length > 0) {
+        hasContent = true;
+        const invitesHeader = document.createElement("div");
+        invitesHeader.className = "app-list-section-header";
+        invitesHeader.textContent = "دعوات اللعب";
+        body.appendChild(invitesHeader);
+
         invites.forEach((invite) => body.appendChild(buildInviteNotificationCard(invite)));
     }
 
+    if (!hasContent) {
+        const empty = document.createElement("div");
+        empty.className = "app-list-empty";
+        empty.textContent = "لا توجد إشعارات حالياً.";
+        body.appendChild(empty);
+    }
+
     openAppPanel({
-        title: "طلبات اللعب",
+        title: "الإشعارات",
         bodyNode: body,
     });
 }
@@ -561,7 +668,9 @@ async function openInviteFriendsModal(gameKey, roomCode) {
             inviteBtn.type = "button";
             inviteBtn.className = "btn btn-primary app-list-action-btn";
             inviteBtn.textContent = "دعوة";
+            applyInviteButtonCooldown(inviteBtn, friend.id);
             inviteBtn.onclick = async () => {
+                if (inviteBtn.disabled) return;
                 const sendResponse = await fetch("/invites", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -581,11 +690,11 @@ async function openInviteFriendsModal(gameKey, roomCode) {
                     });
                     return;
                 }
-
-                await openAppAlert(`تم إرسال دعوة اللعب إلى ${friendName}.`, {
-                    title: "تم الإرسال",
-                    confirmLabel: "حسناً",
-                });
+                inviteCooldownUntilByFriendId.set(
+                    friend.id,
+                    Date.now() + INVITE_BUTTON_COOLDOWN_SECONDS * 1000
+                );
+                applyInviteButtonCooldown(inviteBtn, friend.id);
             };
 
             actions.appendChild(inviteBtn);
@@ -624,7 +733,35 @@ async function respondToInvite(inviteId, action) {
         return;
     }
 
-    await loadGameRequestsPanel();
+    await loadNotificationsPanel();
+    await updateNotificationBadge();
+}
+
+async function respondToFriendRequest(requesterId, action) {
+    const endpoint = action === "accept" ? `/friends/${requesterId}/accept` : `/friends/${requesterId}/decline`;
+    const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        await openAppAlert(data.detail || `تعذر ${action === "accept" ? "قبول" : "رفض"} طلب الصداقة.`, {
+            title: "خطأ",
+            confirmLabel: "إغلاق",
+            danger: true,
+        });
+        return;
+    }
+
+    await openAppAlert(`تم ${action === "accept" ? "قبول" : "رفض"} طلب الصداقة بنجاح.`, {
+        title: "تم التحديث",
+        confirmLabel: "حسناً",
+    });
+
+    await loadNotificationsPanel();
+    await updateNotificationBadge();
 }
 
 function toggleProfileDropdown() {
@@ -635,8 +772,73 @@ function toggleProfileDropdown() {
 }
 
 function showGameRequests() {
-    loadGameRequestsPanel();
+    loadNotificationsPanel();
 }
+
+function connectNotificationWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/notifications`;
+
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = function(event) {
+        console.log('Notification WebSocket connected');
+    };
+
+    ws.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'notification_count') {
+                updateBadgeDisplay(data.count);
+            }
+        } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+        }
+    };
+
+    ws.onclose = function(event) {
+        console.log('Notification WebSocket disconnected');
+        // Reconnect after 5 seconds
+        setTimeout(connectNotificationWebSocket, 5000);
+    };
+
+    ws.onerror = function(error) {
+        console.error('Notification WebSocket error:', error);
+    };
+}
+
+function updateBadgeDisplay(count) {
+    const badge = document.getElementById("notificationBadge");
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count > 99 ? "99+" : count;
+            badge.classList.remove("hidden");
+        } else {
+            badge.classList.add("hidden");
+        }
+    }
+}
+
+async function updateNotificationBadge() {
+    try {
+        const [invitesResponse, requestsResponse] = await Promise.all([
+            fetch("/invites"),
+            fetch("/friends/requests")
+        ]);
+
+        const invites = invitesResponse.ok ? await invitesResponse.json() : [];
+        const friendRequests = requestsResponse.ok ? await requestsResponse.json() : [];
+
+        const pendingInvites = invites.filter(invite => invite.status === "pending");
+        const totalCount = pendingInvites.length + friendRequests.length;
+
+        updateBadgeDisplay(totalCount);
+    } catch (error) {
+        console.error("Error updating notification badge:", error);
+    }
+}
+
+window.updateNotificationBadge = updateNotificationBadge;
 
 document.addEventListener("click", function(event) {
     const dropdown = document.getElementById("profileDropdown");
@@ -648,6 +850,15 @@ document.addEventListener("click", function(event) {
         }
     }
 });
+
+// Update badge on page load if user is logged in
+if (document.querySelector(".nav-game-requests-btn")) {
+    updateNotificationBadge();
+    // Connect to WebSocket for real-time updates
+    connectNotificationWebSocket();
+    // Fallback polling every 30 seconds in case WebSocket fails
+    setInterval(updateNotificationBadge, 30000);
+}
 </script>
 
 </body>

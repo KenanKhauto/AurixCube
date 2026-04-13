@@ -19,6 +19,7 @@ class WhoAmIPlayer:
     identity: str = ""
     has_guessed_correctly: bool = False
     guess_count: int = 0
+    latest_guess_text: str = ""
     solved_order: Optional[int] = None
     character_id: str = "char1"
     last_seen: datetime = field(default_factory=datetime.now)
