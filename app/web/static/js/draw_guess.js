@@ -26,6 +26,7 @@ let drawIsDrawing = false;
 let drawLastX = 0;
 let drawLastY = 0;
 let drawStrokeHistory = [];
+let lastDrawCanvasSessionKey = null;
 
 const MAX_DRAW_CATEGORIES = 12;
 const drawPlayerCountOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -1359,18 +1360,21 @@ function renderDrawState(data) {
     currentDrawRoomData = data;
 
     if (data.ended || data.phase === "game_over") {
+        lastDrawCanvasSessionKey = null;
         renderDrawGameOver(data);
         updateDrawRoomActionButtons();
         return;
     }
 
     if (!data.started || data.phase === "waiting") {
+        lastDrawCanvasSessionKey = null;
         renderDrawWaitingRoom(data);
         updateDrawRoomActionButtons();
         return;
     }
 
     if (data.phase === "word_choice") {
+        lastDrawCanvasSessionKey = null;
         renderDrawWordChoice(data);
         updateDrawRoomActionButtons();
         return;
@@ -1383,6 +1387,7 @@ function renderDrawState(data) {
     }
 
     if (data.phase === "round_result") {
+        lastDrawCanvasSessionKey = null;
         renderDrawRoundResult(data);
         updateDrawRoomActionButtons();
     }
@@ -1477,18 +1482,14 @@ function renderDrawPlay(data, previousData) {
 
     renderDrawTimer("drawTimerPlay", data.phase_deadline_at);
 
-    const isSameDrawingSession =
-        previousData &&
-        previousData.phase === "drawing" &&
-        previousData.current_round === data.current_round &&
-        previousData.current_drawer_id === data.current_drawer_id;
+    const drawSessionKey = `${data.current_round}:${data.current_drawer_id || ""}`;
+    const shouldResetCanvas = !drawCanvas || lastDrawCanvasSessionKey !== drawSessionKey;
 
-    const roundChanged = !previousData || previousData.current_round !== data.current_round;
-
-    if (!isSameDrawingSession || !drawCanvas || roundChanged) {
+    if (shouldResetCanvas) {
         drawStrokeHistory = [];
         setupDrawCanvas();
         (data.strokes || []).forEach((stroke) => drawStroke(stroke, true));
+        lastDrawCanvasSessionKey = drawSessionKey;
     }
 
     const drawer = data.players.find((p) => p.id === data.current_drawer_id);
@@ -1724,14 +1725,79 @@ function getSelectedDisplayedWord(data, language) {
     return data.current_word_en || null;
 }
 
+function hashStringFNV1a(input) {
+    let hash = 2166136261;
+    for (let i = 0; i < input.length; i += 1) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+}
+
+function createSeededRng(seed) {
+    let state = seed >>> 0;
+    return function next() {
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+        return state / 4294967296;
+    };
+}
+
+function buildDeterministicRevealOrder(indexes, seedText) {
+    const order = [...indexes];
+    const rng = createSeededRng(hashStringFNV1a(seedText || "draw-guess-hint"));
+
+    for (let i = order.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(rng() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+    }
+
+    return order;
+}
+
 function buildHiddenWordHint(data) {
-    const choices = data.current_word_choices || [];
-    if (!choices.length) return "؟ ؟ ؟";
+    const targetWord = data.language === "ar"
+        ? (data.current_word_ar || "")
+        : (data.current_word_en || "");
 
-    const first = data.language === "ar" ? choices[0].word_ar : choices[0].word_en;
-    if (!first) return "؟ ؟ ؟";
+    // Fallback to first choice length if the selected word is not yet available.
+    const fallbackWord = (() => {
+        const choices = data.current_word_choices || [];
+        if (!choices.length) return "";
+        return data.language === "ar" ? (choices[0].word_ar || "") : (choices[0].word_en || "");
+    })();
 
-    return first.split("").map(() => "_").join(" ");
+    const word = (targetWord || fallbackWord || "").trim();
+    if (!word) return "؟ ؟ ؟";
+
+    const totalSeconds = Number(data.round_timer_seconds) || 0;
+    const deadlineAt = Number(data.phase_deadline_at) || 0;
+    const secondsLeft = deadlineAt ? Math.max(0, deadlineAt - (Date.now() / 1000)) : 0;
+    const elapsedSeconds = totalSeconds > 0 ? Math.max(0, totalSeconds - secondsLeft) : 0;
+
+    // Reveal letters progressively as time passes, while keeping at least one hidden.
+    const chars = word.split("");
+    const maskableIndexes = chars
+        .map((char, index) => ({ char, index }))
+        .filter(({ char }) => char.trim().length > 0)
+        .map(({ index }) => index);
+
+    if (!maskableIndexes.length) return "؟ ؟ ؟";
+
+    const maxRevealCount = Math.max(0, maskableIndexes.length - 1);
+    const revealProgress = totalSeconds > 0 ? Math.min(1, elapsedSeconds / totalSeconds) : 0;
+    const revealCount = Math.min(maxRevealCount, Math.floor(maskableIndexes.length * revealProgress));
+
+    const revealSeed = `${data.room_code || ""}:${data.current_round || 0}:${data.current_drawer_id || ""}:${word}`;
+    const randomizedOrder = buildDeterministicRevealOrder(maskableIndexes, revealSeed);
+    const revealedSet = new Set(randomizedOrder.slice(0, revealCount));
+
+    return chars
+        .map((char, index) => {
+            if (char.trim().length === 0) return " ";
+            if (revealedSet.has(index)) return char;
+            return "_";
+        })
+        .join(" ");
 }
 
 function renderDrawTimer(elementId, deadlineAt) {
@@ -1752,6 +1818,14 @@ function updateDrawLiveTimer(data) {
     if (!data) return;
     if (data.phase === "drawing") {
         renderDrawTimer("drawTimerPlay", data.phase_deadline_at);
+
+        const isDrawer = data.current_drawer_id === currentDrawPlayerId;
+        if (!isDrawer) {
+            const hintEl = document.getElementById("drawWordHint");
+            if (hintEl) {
+                hintEl.textContent = buildHiddenWordHint(data);
+            }
+        }
     }
 }
 
