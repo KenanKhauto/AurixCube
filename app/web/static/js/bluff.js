@@ -985,7 +985,7 @@ function updateBluffRoomActionButtons() {
 
 function buildBluffStateSignature(data) {
     const playersSignature = data.players
-        .map((player) => `${player.id}:${player.score}`)
+        .map((player) => `${player.id}:${player.score}:${player.character_id || ""}`)
         .join("|");
 
     const categoriesSignature = (data.categories || []).join("|");
@@ -1669,3 +1669,518 @@ async function maybeAutoJoinBluffInvite() {
 document.addEventListener("DOMContentLoaded", () => {
     maybeAutoJoinBluffInvite();
 });
+
+let bluffWS = null;
+let bluffWSRoomCode = null;
+let bluffWSShouldReconnect = false;
+let bluffWSReconnectTimer = null;
+let bluffActionCounter = 0;
+let latestBluffRoomVersion = 0;
+const pendingBluffActions = new Map();
+
+function nextBluffActionId() {
+    bluffActionCounter += 1;
+    return `bluff-action-${Date.now()}-${bluffActionCounter}`;
+}
+
+function sendBluffWSMessage(payload) {
+    if (!bluffWS || bluffWS.readyState !== WebSocket.OPEN) return false;
+    try {
+        bluffWS.send(JSON.stringify(payload));
+        return true;
+    } catch (error) {
+        console.error("Bluff WS send failed:", error);
+        return false;
+    }
+}
+
+function sendBluffWSAction(actionType, payload = {}) {
+    if (!bluffWS || bluffWS.readyState !== WebSocket.OPEN) {
+        return Promise.reject(new Error("Realtime connection is not ready."));
+    }
+
+    const actionId = nextBluffActionId();
+    const message = {
+        type: actionType,
+        action_id: actionId,
+        player_id: currentBluffPlayerId,
+        ...payload,
+    };
+
+    const timeoutId = setTimeout(() => {
+        const pending = pendingBluffActions.get(actionId);
+        if (!pending) return;
+        pendingBluffActions.delete(actionId);
+        pending.reject(new Error("Action timed out."));
+    }, 8000);
+
+    return new Promise((resolve, reject) => {
+        pendingBluffActions.set(actionId, {
+            resolve: () => {
+                clearTimeout(timeoutId);
+                resolve();
+            },
+            reject: (error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+            },
+        });
+
+        const sent = sendBluffWSMessage(message);
+        if (!sent) {
+            const pending = pendingBluffActions.get(actionId);
+            if (pending) {
+                pendingBluffActions.delete(actionId);
+                pending.reject(new Error("Realtime connection is not ready."));
+            }
+        }
+    });
+}
+
+function clearBluffWSReconnectTimer() {
+    if (!bluffWSReconnectTimer) return;
+    clearTimeout(bluffWSReconnectTimer);
+    bluffWSReconnectTimer = null;
+}
+
+function scheduleBluffWSReconnect(roomCode) {
+    if (!bluffWSShouldReconnect || !roomCode || !currentBluffPlayerId || bluffWSReconnectTimer) return;
+    bluffWSReconnectTimer = setTimeout(() => {
+        bluffWSReconnectTimer = null;
+        if (!bluffWSShouldReconnect || currentBluffRoomCode !== roomCode || !currentBluffPlayerId) return;
+        connectBluffWS(roomCode);
+    }, 1500);
+}
+
+function closeBluffWS({ shouldReconnect = false } = {}) {
+    bluffWSShouldReconnect = shouldReconnect;
+    clearBluffWSReconnectTimer();
+
+    if (!bluffWS) {
+        bluffWSRoomCode = null;
+        return;
+    }
+
+    const socket = bluffWS;
+    bluffWS = null;
+    bluffWSRoomCode = null;
+
+    socket.onopen = null;
+    socket.onerror = null;
+    socket.onmessage = null;
+    socket.onclose = null;
+
+    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+        try {
+            socket.close();
+        } catch (error) {
+            console.error("Bluff WS close failed:", error);
+        }
+    }
+}
+
+function applyBluffStateSync(state) {
+    if (!state || typeof state !== "object") return;
+
+    const incomingVersion = Number(state.room_version || 0);
+    if (incomingVersion && incomingVersion < latestBluffRoomVersion) return;
+    if (incomingVersion) latestBluffRoomVersion = incomingVersion;
+
+    currentBluffRoomData = state;
+    bluffIsHost = currentBluffPlayerId === state.host_id;
+
+    if (!ensureCurrentBluffPlayerStillInRoom(state)) return;
+
+    const signature = buildBluffStateSignature(state);
+    if (signature === lastRenderedBluffSignature) {
+        updateBluffLiveTimer(state);
+        return;
+    }
+
+    lastRenderedBluffSignature = signature;
+    renderBluffState(state);
+}
+
+function connectBluffWS(roomCode) {
+    if (!roomCode || !currentBluffPlayerId) return;
+    if (
+        bluffWS &&
+        bluffWSRoomCode === roomCode &&
+        (bluffWS.readyState === WebSocket.OPEN || bluffWS.readyState === WebSocket.CONNECTING)
+    ) {
+        return;
+    }
+
+    closeBluffWS({ shouldReconnect: false });
+    bluffWSShouldReconnect = true;
+    clearBluffWSReconnectTimer();
+
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const wsUrl = `${protocol}://${window.location.host}/api/bluff/ws/${roomCode}?player_id=${encodeURIComponent(currentBluffPlayerId)}`;
+
+    let socket;
+    try {
+        socket = new WebSocket(wsUrl);
+    } catch (error) {
+        console.error("Bluff WS create failed:", error);
+        scheduleBluffWSReconnect(roomCode);
+        return;
+    }
+
+    bluffWS = socket;
+    bluffWSRoomCode = roomCode;
+
+    socket.onopen = () => {
+        if (bluffWS !== socket) return;
+        clearBluffWSReconnectTimer();
+        sendBluffWSMessage({
+            type: "sync_request",
+            action_id: nextBluffActionId(),
+            player_id: currentBluffPlayerId,
+        });
+    };
+
+    socket.onmessage = (event) => {
+        if (bluffWS !== socket) return;
+        try {
+            const data = JSON.parse(event.data);
+
+            if (data.type === "state_sync" && data.state) {
+                applyBluffStateSync(data.state);
+                return;
+            }
+
+            if (data.type === "action_ack" && data.action_id) {
+                const pending = pendingBluffActions.get(data.action_id);
+                if (pending) {
+                    pendingBluffActions.delete(data.action_id);
+                    pending.resolve();
+                }
+                return;
+            }
+
+            if (data.type === "action_error") {
+                if (data.action_id) {
+                    const pending = pendingBluffActions.get(data.action_id);
+                    if (pending) {
+                        pendingBluffActions.delete(data.action_id);
+                        pending.reject(new Error(data.detail || "Action failed."));
+                    }
+                }
+                if (data.detail) showBluffError(data.detail);
+            }
+        } catch (error) {
+            console.error("Bluff WS message error:", error);
+        }
+    };
+
+    socket.onclose = () => {
+        if (bluffWS === socket) {
+            bluffWS = null;
+            bluffWSRoomCode = null;
+        }
+        if (bluffWSShouldReconnect && currentBluffRoomCode === roomCode && currentBluffPlayerId) {
+            scheduleBluffWSReconnect(roomCode);
+        }
+    };
+
+    socket.onerror = (error) => {
+        console.error("Bluff WS error:", error);
+    };
+}
+
+const originalBluffCreateRoom = createBluffRoom;
+createBluffRoom = async function() {
+    await originalBluffCreateRoom();
+    if (currentBluffRoomCode && currentBluffPlayerId) connectBluffWS(currentBluffRoomCode);
+};
+
+const originalBluffJoinRoom = joinBluffRoom;
+joinBluffRoom = async function() {
+    await originalBluffJoinRoom();
+    if (currentBluffRoomCode && currentBluffPlayerId) connectBluffWS(currentBluffRoomCode);
+};
+
+const originalBluffUpdateCharacter = updateBluffLobbyCharacter;
+updateBluffLobbyCharacter = async function(characterId) {
+    if (currentBluffRoomCode && currentBluffPlayerId && bluffWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendBluffWSAction("update_character", { character_id: characterId });
+            selectedBluffCharacter = characterId;
+            localStorage.setItem("bluff_character_id", selectedBluffCharacter);
+            return;
+        } catch (error) {
+            showBluffError(error.message || "Unable to update character.");
+            return;
+        }
+    }
+    await originalBluffUpdateCharacter(characterId);
+};
+
+toggleBluffCategory = async function(categoryKey) {
+    if (!bluffIsHost || currentBluffRoomData?.started) return;
+
+    const isSelected = selectedBluffCategories.includes(categoryKey);
+    let nextCategories;
+
+    if (isSelected) {
+        nextCategories = selectedBluffCategories.filter((c) => c !== categoryKey);
+    } else {
+        if (selectedBluffCategories.length >= MAX_CATEGORIES) {
+            showBluffError(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
+            return;
+        }
+        nextCategories = [...selectedBluffCategories, categoryKey];
+    }
+
+    if (bluffWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendBluffWSAction("update_categories", { categories: nextCategories });
+            return;
+        } catch (error) {
+            showBluffError(error.message || "تعذر تحديث التصنيفات.");
+            return;
+        }
+    }
+
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/categories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            host_id: currentBluffPlayerId,
+            categories: nextCategories
+        })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showBluffError(data.detail || "تعذر تحديث التصنيفات.");
+        return;
+    }
+    applyBluffStateSync(data);
+};
+
+startBluffGame = async function() {
+    if ((currentBluffRoomData?.categories || []).length === 0) {
+        showBluffError("اختر تصنيفًا واحدًا على الأقل قبل بدء اللعبة.");
+        return;
+    }
+    if (bluffWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendBluffWSAction("start_game");
+            return;
+        } catch (error) {
+            showBluffError(error.message || "تعذر بدء اللعبة.");
+            return;
+        }
+    }
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/start`, { method: "POST" });
+    const data = await response.json();
+    if (!response.ok) {
+        showBluffError(data.detail || "تعذر بدء اللعبة.");
+        return;
+    }
+    applyBluffStateSync(data);
+};
+
+selectBluffRoundCategory = async function(category) {
+    if (bluffWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendBluffWSAction("select_category", { category });
+            return;
+        } catch (error) {
+            showBluffError(error.message || "تعذر اختيار التصنيف.");
+            return;
+        }
+    }
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/select-category`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ player_id: currentBluffPlayerId, category })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showBluffError(data.detail || "تعذر اختيار التصنيف.");
+        return;
+    }
+    applyBluffStateSync(data);
+};
+
+submitBluffAnswer = async function() {
+    const input = document.getElementById("bluffAnswerInput");
+    const answerText = input?.value?.trim() || "";
+    if (!answerText) {
+        showBluffError("اكتب إجابة أولًا.");
+        return;
+    }
+
+    if (bluffWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendBluffWSAction("submit_answer", { answer_text: answerText });
+            if (input) input.value = "";
+            return;
+        } catch (error) {
+            showBluffError(error.message || "تعذر إرسال الإجابة.");
+            return;
+        }
+    }
+
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/submit-answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ player_id: currentBluffPlayerId, answer_text: answerText })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showBluffError(data.detail || "تعذر إرسال الإجابة.");
+        return;
+    }
+    if (input) input.value = "";
+    applyBluffStateSync(data);
+};
+
+submitBluffPick = async function(optionId) {
+    if (bluffWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendBluffWSAction("submit_pick", { option_id: optionId });
+            return;
+        } catch (error) {
+            showBluffError(error.message || "تعذر إرسال الاختيار.");
+            return;
+        }
+    }
+
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/submit-pick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ player_id: currentBluffPlayerId, option_id: optionId })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showBluffError(data.detail || "تعذر إرسال الاختيار.");
+        return;
+    }
+    applyBluffStateSync(data);
+};
+
+advanceBluffRound = async function() {
+    if (bluffWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendBluffWSAction("advance_round");
+            return;
+        } catch (error) {
+            showBluffError(error.message || "تعذر الانتقال للجولة التالية.");
+            return;
+        }
+    }
+
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/advance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ player_id: currentBluffPlayerId })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showBluffError(data.detail || "تعذر الانتقال للجولة التالية.");
+        return;
+    }
+    applyBluffStateSync(data);
+};
+
+restartBluffGame = async function() {
+    const categories = selectedBluffCategories.length > 0
+        ? selectedBluffCategories
+        : currentBluffRoomData?.categories || [];
+    if (categories.length === 0) {
+        showBluffError("اختر تصنيفًا واحدًا على الأقل.");
+        return;
+    }
+
+    const totalRounds = selectedBluffRounds || currentBluffRoomData?.total_rounds || categories.length;
+    const roundTimer = selectedBluffRoundTimer || currentBluffRoomData?.round_timer_seconds || 30;
+
+    if (bluffWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendBluffWSAction("restart_game", {
+                categories,
+                total_rounds: totalRounds,
+                round_timer_seconds: roundTimer,
+            });
+            return;
+        } catch (error) {
+            showBluffError(error.message || "تعذر إعادة اللعبة.");
+            return;
+        }
+    }
+
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/restart`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            categories,
+            total_rounds: totalRounds,
+            round_timer_seconds: roundTimer,
+        })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showBluffError(data.detail || "تعذر إعادة اللعبة.");
+        return;
+    }
+    applyBluffStateSync(data);
+};
+
+removeBluffPlayer = async function(playerIdToRemove) {
+    if (bluffWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendBluffWSAction("remove_player", { player_id_to_remove: playerIdToRemove });
+            return;
+        } catch (error) {
+            showBluffError(error.message || "تعذر حذف اللاعب من الغرفة.");
+            return;
+        }
+    }
+
+    const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/remove-player`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            host_id: currentBluffPlayerId,
+            player_id_to_remove: playerIdToRemove
+        })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showBluffError(data.detail || "تعذر حذف اللاعب من الغرفة.");
+        return;
+    }
+    applyBluffStateSync(data);
+};
+
+const originalBluffLeaveRoom = leaveBluffRoom;
+leaveBluffRoom = async function() {
+    if (bluffWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendBluffWSAction("leave");
+        } catch (error) {
+            console.warn("Bluff WS leave failed, falling back to REST:", error);
+        }
+    }
+    closeBluffWS({ shouldReconnect: false });
+    await originalBluffLeaveRoom();
+};
+
+const originalClearBluffLocalState = clearBluffLocalState;
+clearBluffLocalState = function() {
+    closeBluffWS({ shouldReconnect: false });
+    latestBluffRoomVersion = 0;
+    originalClearBluffLocalState();
+};
+
+const originalRefreshBluffRoomState = refreshBluffRoomState;
+refreshBluffRoomState = async function() {
+    if (currentBluffRoomCode && currentBluffPlayerId) {
+        connectBluffWS(currentBluffRoomCode);
+    }
+    if (bluffWS?.readyState === WebSocket.OPEN) return;
+    await originalRefreshBluffRoomState();
+};

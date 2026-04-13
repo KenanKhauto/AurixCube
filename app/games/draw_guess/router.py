@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 def build_room_response(room) -> DrawGuessRoomStateResponse:
     return DrawGuessRoomStateResponse(
         room_code=room.room_code,
+        room_version=room.room_version,
         host_id=room.host_id,
         max_player_count=room.max_player_count,
         total_rounds=room.total_rounds,
@@ -128,7 +129,7 @@ def create_room(
 
 
 @router.post("/rooms/{room_code}/join", response_model=DrawGuessRoomStateResponse)
-def join_room(
+async def join_room(
     room_code: str,
     payload: DrawGuessJoinRoomRequest,
     current_user: User | None = Depends(get_current_user_optional),
@@ -140,7 +141,12 @@ def join_room(
             payload.character_id,
             current_user.username if current_user else None,
         )
-        return build_room_response(room)
+        response = build_room_response(room)
+        await manager.broadcast(
+            room_code,
+            {"type": "state_sync", "state": response.model_dump()},
+        )
+        return response
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -257,6 +263,47 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
     player_id = websocket.query_params.get("player_id")
     await manager.connect(room_code, websocket, player_id=player_id)
 
+    async def send_action_ack(target_player_id: str | None, action_id: str | None):
+        if not target_player_id or not action_id:
+            return
+        await manager.send_to_player(
+            room_code=room_code,
+            player_id=target_player_id,
+            message={"type": "action_ack", "action_id": action_id},
+        )
+
+    async def send_action_error(target_player_id: str | None, action_id: str | None, detail: str):
+        if not target_player_id:
+            return
+        await manager.send_to_player(
+            room_code=room_code,
+            player_id=target_player_id,
+            message={"type": "action_error", "action_id": action_id, "detail": detail},
+        )
+
+    async def send_state_to_player(target_player_id: str | None):
+        if not target_player_id:
+            return
+        room = service.get_room_state(room_code)
+        await manager.send_to_player(
+            room_code=room_code,
+            player_id=target_player_id,
+            message={"type": "state_sync", "state": build_room_response(room).model_dump()},
+        )
+
+    async def broadcast_state():
+        room = service.get_room_state(room_code)
+        await manager.broadcast(
+            room_code,
+            {"type": "state_sync", "state": build_room_response(room).model_dump()},
+        )
+
+    if player_id:
+        try:
+            await send_state_to_player(player_id)
+        except Exception as exc:
+            logger.warning("Draw WS initial state sync failed room=%s player=%s error=%s", room_code, player_id, exc)
+
     try:
         while True:
             try:
@@ -276,6 +323,7 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                 continue
 
             event_type = data.get("type")
+            action_id = data.get("action_id")
             message_player_id = data.get("player_id")
 
             if message_player_id:
@@ -286,7 +334,15 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                 logger.warning("Draw WS missing event type room=%s player=%s payload=%s", room_code, player_id or "unknown", data)
                 continue
 
-            # DRAW EVENT
+            if event_type == "sync_request":
+                try:
+                    await send_state_to_player(player_id)
+                    await send_action_ack(player_id, action_id)
+                except Exception as exc:
+                    logger.warning("Draw WS sync_request failed room=%s player=%s error=%s", room_code, player_id or "unknown", exc)
+                    await send_action_error(player_id, action_id, str(exc))
+                continue
+
             if event_type == "draw":
                 try:
                     stroke = DrawGuessStroke(
@@ -298,13 +354,12 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                         width=float(data.get("width", 2)),
                     )
 
-                    room = service.add_stroke(
+                    service.add_stroke(
                         room_code=room_code,
                         player_id=data["player_id"],
-                        stroke=stroke
+                        stroke=stroke,
                     )
 
-                    # Send stroke with proper format to all players except sender
                     await manager.broadcast(room_code, {
                         "type": "draw",
                         "stroke": {
@@ -314,19 +369,20 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                             "y1": stroke.y1,
                             "color": stroke.color,
                             "width": stroke.width,
-                            "player_id": data["player_id"]
-                        }
+                            "player_id": data["player_id"],
+                        },
                     })
-                except (ValueError, KeyError, TypeError) as e:
-                    logger.warning("Draw WS invalid draw payload room=%s player=%s error=%s payload=%s", room_code, player_id or "unknown", e, data)
+                    await send_action_ack(player_id, action_id)
+                except (ValueError, KeyError, TypeError) as exc:
+                    logger.warning("Draw WS invalid draw payload room=%s player=%s error=%s payload=%s", room_code, player_id or "unknown", exc, data)
+                    await send_action_error(player_id, action_id, str(exc))
 
-            # GUESS EVENT
             elif event_type == "guess":
                 try:
                     room = service.submit_guess(
                         room_code=room_code,
                         player_id=data["player_id"],
-                        guess_text=data["text"]
+                        guess_text=data["text"],
                     )
 
                     last_guess = room.guesses[-1]
@@ -336,7 +392,7 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                             "player_name": last_guess.player_name,
                             "text": last_guess.text,
                             "is_correct": last_guess.is_correct,
-                            "player_id": last_guess.player_id
+                            "player_id": last_guess.player_id,
                         })
                     else:
                         await manager.send_to_player(
@@ -347,7 +403,7 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                                 "player_name": last_guess.player_name,
                                 "text": last_guess.text,
                                 "is_correct": last_guess.is_correct,
-                                "player_id": last_guess.player_id
+                                "player_id": last_guess.player_id,
                             },
                         )
                         await manager.send_to_player(
@@ -355,29 +411,90 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                             player_id=last_guess.player_id,
                             message={
                                 "type": "guess_hint_private",
-                                "text": "تخمينك قريب من الكلمة!",
+                                "text": "\u062A\u062E\u0645\u064A\u0646\u0643 \u0642\u0631\u064A\u0628 \u0645\u0646 \u0627\u0644\u0643\u0644\u0645\u0629!",
                             },
                         )
-                except (ValueError, KeyError, TypeError) as e:
-                    logger.warning("Draw WS invalid guess payload room=%s player=%s error=%s payload=%s", room_code, player_id or "unknown", e, data)
 
-            # CLEAR CANVAS
+                    await broadcast_state()
+                    await send_action_ack(player_id, action_id)
+                except (ValueError, KeyError, TypeError) as exc:
+                    logger.warning("Draw WS invalid guess payload room=%s player=%s error=%s payload=%s", room_code, player_id or "unknown", exc, data)
+                    await send_action_error(player_id, action_id, str(exc))
+
+            elif event_type == "update_character":
+                try:
+                    service.update_character(
+                        room_code=room_code,
+                        player_id=str(data["player_id"]),
+                        character_id=str(data["character_id"]),
+                    )
+                    await broadcast_state()
+                    await send_action_ack(player_id, action_id)
+                except (ValueError, KeyError, TypeError) as exc:
+                    logger.warning("Draw WS update_character failed room=%s player=%s error=%s payload=%s", room_code, player_id or "unknown", exc, data)
+                    await send_action_error(player_id, action_id, str(exc))
+
+            elif event_type == "update_categories":
+                try:
+                    service.update_categories(
+                        room_code=room_code,
+                        host_id=str(data["player_id"]),
+                        categories=list(data.get("categories", [])),
+                    )
+                    await broadcast_state()
+                    await send_action_ack(player_id, action_id)
+                except (ValueError, KeyError, TypeError) as exc:
+                    logger.warning("Draw WS update_categories failed room=%s player=%s error=%s payload=%s", room_code, player_id or "unknown", exc, data)
+                    await send_action_error(player_id, action_id, str(exc))
+
+            elif event_type == "start_game":
+                try:
+                    service.start_game(room_code=room_code)
+                    await broadcast_state()
+                    await send_action_ack(player_id, action_id)
+                except Exception as exc:
+                    logger.warning("Draw WS start_game failed room=%s player=%s error=%s", room_code, player_id or "unknown", exc)
+                    await send_action_error(player_id, action_id, str(exc))
+
+            elif event_type == "select_word":
+                try:
+                    service.select_word(
+                        room_code=room_code,
+                        player_id=str(data["player_id"]),
+                        chosen_word_en=str(data["chosen_word_en"]),
+                    )
+                    await broadcast_state()
+                    await send_action_ack(player_id, action_id)
+                except (ValueError, KeyError, TypeError) as exc:
+                    logger.warning("Draw WS select_word failed room=%s player=%s error=%s payload=%s", room_code, player_id or "unknown", exc, data)
+                    await send_action_error(player_id, action_id, str(exc))
+
+            elif event_type == "advance_round":
+                try:
+                    service.advance_round(
+                        room_code=room_code,
+                        player_id=str(data["player_id"]),
+                    )
+                    await broadcast_state()
+                    await send_action_ack(player_id, action_id)
+                except (ValueError, KeyError, TypeError) as exc:
+                    logger.warning("Draw WS advance_round failed room=%s player=%s error=%s payload=%s", room_code, player_id or "unknown", exc, data)
+                    await send_action_error(player_id, action_id, str(exc))
+
             elif event_type == "clear":
-                await manager.broadcast(room_code, {
-                    "type": "clear"
-                })
+                await manager.broadcast(room_code, {"type": "clear"})
+                await send_action_ack(player_id, action_id)
 
-            # LEAVE EVENT
             elif event_type == "leave":
                 try:
-                    service.leave_room(room_code, data["player_id"])
-                    await manager.broadcast(room_code, {
-                        "type": "player_left",
-                        "player_id": data["player_id"]
-                    })
+                    room = service.leave_room(room_code, data["player_id"])
+                    if room is not None:
+                        await broadcast_state()
+                    await send_action_ack(player_id, action_id)
                     logger.info("Draw WS leave event room=%s player=%s", room_code, data["player_id"])
                 except Exception as exc:
                     logger.warning("Draw WS leave event failed room=%s player=%s error=%s", room_code, player_id or "unknown", exc)
+                    await send_action_error(player_id, action_id, str(exc))
                 finally:
                     manager.disconnect(room_code, websocket)
                     break

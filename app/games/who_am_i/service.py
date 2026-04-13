@@ -57,7 +57,7 @@ class WhoAmIService:
             character_id=character_id,
         )
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         return room
 
     def join_room(self, room_code: str, player_name: str, character_id:str, auth_username: str | None) -> WhoAmIRoom:
@@ -89,7 +89,7 @@ class WhoAmIService:
             room.full_turn_order.append(player_id)
             room.active_turn_order.append(player_id)
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         return room
 
     def update_character(self, room_code: str, player_id: str, character_id: str) -> WhoAmIRoom:
@@ -103,7 +103,7 @@ class WhoAmIService:
             raise ValueError("Invalid character.")
 
         room.players[player_id].character_id = character_id
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         return room
 
     def leave_room(self, room_code: str, player_id: str) -> Optional[WhoAmIRoom]:
@@ -126,7 +126,7 @@ class WhoAmIService:
 
         self._finalize_room_after_player_removal(room)
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         return room
 
     def update_categories(self, room_code: str, host_id: str, categories: list[str]) -> WhoAmIRoom:
@@ -139,7 +139,7 @@ class WhoAmIService:
             raise ValueError("Categories can only be updated before the game starts.")
 
         room.categories = self._validate_categories(categories, allow_empty=True)
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         return room
 
     def remove_player(self, room_code: str, host_id: str, player_id_to_remove: str) -> WhoAmIRoom:
@@ -162,14 +162,14 @@ class WhoAmIService:
 
         self._finalize_room_after_player_removal(room)
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         return room
 
     def heartbeat(self, room_code: str, player_id: str) -> None:
         room = self._get_room(room_code)
         if player_id in room.players:
             room.players[player_id].last_seen = datetime.now()
-            self.room_repository.save_room(room_code, self._serialize_room(room))
+            self._save_room(room, bump_version=False)
 
     def delete_room(self, room_code: str, player_id: str) -> None:
         """
@@ -182,7 +182,7 @@ class WhoAmIService:
 
         room.ended = True
         room.end_reason = "host_deleted"
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         self.room_repository.delete_room(room_code)
 
     def _cleanup_inactive_players(self, room: WhoAmIRoom) -> None:
@@ -248,7 +248,7 @@ class WhoAmIService:
 
         room.solve_counter = 0
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         return room
 
 
@@ -331,7 +331,7 @@ class WhoAmIService:
             room.current_reveal_player_id = None
             room.current_turn_player_id = room.active_turn_order[0] if room.active_turn_order else None
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         return room
 
     def submit_guess(self, room_code: str, player_id: str, guess_text: str) -> WhoAmIRoom:
@@ -389,7 +389,7 @@ class WhoAmIService:
         else:
             self._advance_turn(room)
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         return room
 
     def restart_game(self, room_code: str, categories: list[str]) -> WhoAmIRoom:
@@ -422,7 +422,7 @@ class WhoAmIService:
             player.latest_guess_text = ""
             player.solved_order = None
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room)
         return room
 
     def _validate_categories(self, categories: list[str], allow_empty: bool = False) -> list[str]:
@@ -447,7 +447,7 @@ class WhoAmIService:
         room = self._get_room(room_code)
         self._cleanup_inactive_players(room)
         if room.players:
-            self.room_repository.save_room(room_code, self._serialize_room(room))
+            self._save_room(room)
         return room
 
     def _advance_turn(self, room: WhoAmIRoom, solved_player_id: str | None = None) -> None:
@@ -580,6 +580,7 @@ class WhoAmIService:
         """
         return {
             "room_code": room.room_code,
+            "room_version": room.room_version,
             "host_id": room.host_id,
             "categories": room.categories,
             "max_player_count": room.max_player_count,
@@ -617,6 +618,7 @@ class WhoAmIService:
         room = WhoAmIRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],
+            room_version=data.get("room_version", 0),
             categories=data.get("categories", []),
             max_player_count=data["max_player_count"],
             started=data["started"],
@@ -646,6 +648,11 @@ class WhoAmIService:
             )
 
         return room
+
+    def _save_room(self, room: WhoAmIRoom, bump_version: bool = True) -> None:
+        if bump_version:
+            room.room_version += 1
+        self.room_repository.save_room(room.room_code, self._serialize_room(room))
     
     def get_player_knowledge_view(self, room_code: str, viewer_player_id: str) -> list[dict]:
         """

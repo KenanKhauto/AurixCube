@@ -34,6 +34,7 @@ class WhoAmIRoom:
     room_code: str
     host_id: str
     max_player_count: int
+    room_version: int = 0
     started: bool = False
     ended: bool = False
     end_reason: Optional[str] = None  # e.g., "game_completed", "insufficient_players", "host_deleted"

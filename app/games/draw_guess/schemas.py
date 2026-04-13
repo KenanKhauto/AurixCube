@@ -93,6 +93,7 @@ class DrawGuessStrokeView(BaseModel):
 
 class DrawGuessRoomStateResponse(BaseModel):
     room_code: str
+    room_version: int
     host_id: str
     max_player_count: int
     total_rounds: int

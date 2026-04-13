@@ -61,6 +61,7 @@ class DrawGuessRoom:
     winner_ids: List[str] = field(default_factory=list)
 
     current_round: int = 1
+    room_version: int = 0
     phase: str = "waiting"  # waiting | word_choice | drawing | round_result | game_over
 
     players: Dict[str, DrawGuessPlayer] = field(default_factory=dict)

@@ -1,6 +1,9 @@
 """API routes for the Bluff game."""
 
-from fastapi import APIRouter, Depends, HTTPException
+import json
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.auth.dependencies import get_current_user_optional
 from app.db.models.user import User
@@ -23,15 +26,18 @@ from app.games.bluff.schemas import (
     BluffUpdateCategoriesRequest,
 )
 from app.games.bluff.service import BluffGameService
+from app.games.bluff.websocket_manager import manager
 
 router = APIRouter()
 service = BluffGameService()
+logger = logging.getLogger(__name__)
 
 
 def build_room_response(room) -> BluffRoomStateResponse:
     """Convert domain room to API response schema."""
     return BluffRoomStateResponse(
         room_code=room.room_code,
+        room_version=room.room_version,
         host_id=room.host_id,
         categories=room.categories,
         max_player_count=room.max_player_count,
@@ -107,7 +113,7 @@ def create_room(
 
 
 @router.post("/rooms/{room_code}/join", response_model=BluffRoomStateResponse)
-def join_room(
+async def join_room(
     room_code: str,
     payload: BluffJoinRoomRequest,
     current_user: User | None = Depends(get_current_user_optional),
@@ -120,7 +126,12 @@ def join_room(
             payload.character_id,
             current_user.username if current_user else None,
         )
-        return build_room_response(room)
+        response = build_room_response(room)
+        await manager.broadcast(
+            room_code,
+            {"type": "state_sync", "state": response.model_dump()},
+        )
+        return response
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -255,3 +266,129 @@ def heartbeat(room_code: str, payload: BluffLeaveRoomRequest):  # reuse the sche
         return {"message": "Heartbeat received."}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.websocket("/ws/{room_code}")
+async def websocket_endpoint(websocket: WebSocket, room_code: str):
+    player_id = websocket.query_params.get("player_id")
+    await manager.connect(room_code, websocket, player_id=player_id)
+
+    async def send_action_ack(target_player_id: str | None, action_id: str | None):
+        if not target_player_id or not action_id:
+            return
+        await manager.send_to_player(
+            room_code=room_code,
+            player_id=target_player_id,
+            message={"type": "action_ack", "action_id": action_id},
+        )
+
+    async def send_action_error(target_player_id: str | None, action_id: str | None, detail: str):
+        if not target_player_id:
+            return
+        await manager.send_to_player(
+            room_code=room_code,
+            player_id=target_player_id,
+            message={"type": "action_error", "action_id": action_id, "detail": detail},
+        )
+
+    async def send_state_to_player(target_player_id: str | None):
+        if not target_player_id:
+            return
+        room = service.get_room_state(room_code)
+        await manager.send_to_player(
+            room_code=room_code,
+            player_id=target_player_id,
+            message={"type": "state_sync", "state": build_room_response(room).model_dump()},
+        )
+
+    async def broadcast_state():
+        room = service.get_room_state(room_code)
+        await manager.broadcast(
+            room_code,
+            {"type": "state_sync", "state": build_room_response(room).model_dump()},
+        )
+
+    if player_id:
+        try:
+            await send_state_to_player(player_id)
+        except Exception as exc:
+            logger.warning("Bluff WS initial sync failed room=%s player=%s error=%s", room_code, player_id, exc)
+
+    try:
+        while True:
+            try:
+                raw_message = await websocket.receive_text()
+            except WebSocketDisconnect:
+                raise
+
+            try:
+                data = json.loads(raw_message)
+            except json.JSONDecodeError:
+                continue
+
+            if not isinstance(data, dict):
+                continue
+
+            event_type = data.get("type")
+            action_id = data.get("action_id")
+            message_player_id = data.get("player_id")
+
+            if message_player_id:
+                player_id = str(message_player_id)
+                await manager.register_player(room_code, player_id, websocket)
+
+            if event_type == "sync_request":
+                try:
+                    await send_state_to_player(player_id)
+                    await send_action_ack(player_id, action_id)
+                except Exception as exc:
+                    await send_action_error(player_id, action_id, str(exc))
+                continue
+
+            try:
+                if event_type == "update_character":
+                    service.update_character(room_code, str(data["player_id"]), str(data["character_id"]))
+                elif event_type == "update_categories":
+                    service.update_categories(room_code, str(data["player_id"]), list(data.get("categories", [])))
+                elif event_type == "start_game":
+                    service.start_game(room_code)
+                elif event_type == "select_category":
+                    service.select_category(room_code, str(data["player_id"]), str(data["category"]))
+                elif event_type == "submit_answer":
+                    service.submit_answer(room_code, str(data["player_id"]), str(data["answer_text"]))
+                elif event_type == "submit_pick":
+                    service.submit_pick(room_code, str(data["player_id"]), str(data["option_id"]))
+                elif event_type == "advance_round":
+                    service.advance_round(room_code, str(data["player_id"]))
+                elif event_type == "restart_game":
+                    service.restart_game(
+                        room_code,
+                        list(data.get("categories", [])),
+                        int(data.get("total_rounds", 1)),
+                        int(data.get("round_timer_seconds", 30)),
+                    )
+                elif event_type == "remove_player":
+                    service.remove_player(
+                        room_code,
+                        str(data["player_id"]),
+                        str(data["player_id_to_remove"]),
+                    )
+                elif event_type == "leave":
+                    room = service.leave_room(room_code, str(data["player_id"]))
+                    if room is not None:
+                        await broadcast_state()
+                    await send_action_ack(player_id, action_id)
+                    manager.disconnect(room_code, websocket)
+                    break
+                else:
+                    continue
+
+                await broadcast_state()
+                await send_action_ack(player_id, action_id)
+            except Exception as exc:
+                await send_action_error(player_id, action_id, str(exc))
+
+    except WebSocketDisconnect:
+        pass
+    finally:
+        manager.disconnect(room_code, websocket)

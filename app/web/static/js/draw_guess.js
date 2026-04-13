@@ -27,6 +27,9 @@ let drawLastX = 0;
 let drawLastY = 0;
 let drawStrokeHistory = [];
 let lastDrawCanvasSessionKey = null;
+let latestDrawRoomVersion = 0;
+let drawActionCounter = 0;
+const pendingDrawActions = new Map();
 
 const MAX_DRAW_CATEGORIES = 12;
 const drawPlayerCountOptions = [2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -202,23 +205,13 @@ function renderDrawLobbyCharacterPicker(data) {
 
 async function updateDrawLobbyCharacter(characterId) {
     if (!currentDrawRoomCode || !currentDrawPlayerId) return;
-    const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/character`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            player_id: currentDrawPlayerId,
-            character_id: characterId,
-        }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-        showDrawError(data.detail || "Unable to update character.");
-        return;
+    try {
+        await sendDrawWSAction("update_character", { character_id: characterId });
+        selectedDrawCharacter = characterId;
+        localStorage.setItem("draw_character_id", selectedDrawCharacter);
+    } catch (error) {
+        showDrawError(error.message || "Unable to update character.");
     }
-    selectedDrawCharacter = characterId;
-    localStorage.setItem("draw_character_id", selectedDrawCharacter);
-    currentDrawRoomData = data;
-    renderDrawWaitingRoom(data);
 }
 
 function escapeHtml(value) {
@@ -465,6 +458,11 @@ function legacyConnectDrawWS(roomCode) {
 
     drawWS.onopen = () => {
         console.log("Draw WebSocket connected");
+        sendDrawWSMessage({
+            type: "sync_request",
+            player_id: currentDrawPlayerId,
+            action_id: nextDrawActionId(),
+        });
     };
 
     drawWS.onerror = (error) => {
@@ -474,6 +472,34 @@ function legacyConnectDrawWS(roomCode) {
     drawWS.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
+
+            if (data.type === "state_sync" && data.state) {
+                applyDrawStateSync(data.state);
+                return;
+            }
+
+            if (data.type === "action_ack" && data.action_id) {
+                const pending = pendingDrawActions.get(data.action_id);
+                if (pending) {
+                    pendingDrawActions.delete(data.action_id);
+                    pending.resolve();
+                }
+                return;
+            }
+
+            if (data.type === "action_error") {
+                if (data.action_id) {
+                    const pending = pendingDrawActions.get(data.action_id);
+                    if (pending) {
+                        pendingDrawActions.delete(data.action_id);
+                        pending.reject(new Error(data.detail || "Action failed."));
+                    }
+                }
+                if (data.detail) {
+                    showDrawError(data.detail);
+                }
+                return;
+            }
 
             if (data.type === "draw" && data.stroke) {
                 if (data.stroke.player_id !== currentDrawPlayerId) {
@@ -623,6 +649,11 @@ function connectDrawWS(roomCode) {
 
         clearDrawWSReconnectTimer();
         console.log("Draw WebSocket connected", { roomCode, playerId: currentDrawPlayerId });
+        sendDrawWSMessage({
+            type: "sync_request",
+            player_id: currentDrawPlayerId,
+            action_id: nextDrawActionId(),
+        });
     };
 
     socket.onerror = (error) => {
@@ -640,6 +671,34 @@ function connectDrawWS(roomCode) {
 
         try {
             const data = JSON.parse(event.data);
+
+            if (data.type === "state_sync" && data.state) {
+                applyDrawStateSync(data.state);
+                return;
+            }
+
+            if (data.type === "action_ack" && data.action_id) {
+                const pending = pendingDrawActions.get(data.action_id);
+                if (pending) {
+                    pendingDrawActions.delete(data.action_id);
+                    pending.resolve();
+                }
+                return;
+            }
+
+            if (data.type === "action_error") {
+                if (data.action_id) {
+                    const pending = pendingDrawActions.get(data.action_id);
+                    if (pending) {
+                        pendingDrawActions.delete(data.action_id);
+                        pending.reject(new Error(data.detail || "Action failed."));
+                    }
+                }
+                if (data.detail) {
+                    showDrawError(data.detail);
+                }
+                return;
+            }
 
             if (data.type === "draw" && data.stroke) {
                 if (data.stroke.player_id !== currentDrawPlayerId) {
@@ -713,6 +772,78 @@ function sendDrawWSMessage(payload) {
         console.error("Error sending WebSocket message:", error);
         return false;
     }
+}
+
+function nextDrawActionId() {
+    drawActionCounter += 1;
+    return `draw-action-${Date.now()}-${drawActionCounter}`;
+}
+
+function sendDrawWSAction(actionType, payload = {}) {
+    if (!drawWS || drawWS.readyState !== WebSocket.OPEN) {
+        return Promise.reject(new Error("Realtime connection is not ready."));
+    }
+
+    const actionId = nextDrawActionId();
+    const message = {
+        type: actionType,
+        action_id: actionId,
+        player_id: currentDrawPlayerId,
+        ...payload,
+    };
+
+    const timeoutId = setTimeout(() => {
+        const pending = pendingDrawActions.get(actionId);
+        if (!pending) return;
+        pendingDrawActions.delete(actionId);
+        pending.reject(new Error("Action timed out."));
+    }, 8000);
+
+    return new Promise((resolve, reject) => {
+        pendingDrawActions.set(actionId, {
+            resolve: () => {
+                clearTimeout(timeoutId);
+                resolve();
+            },
+            reject: (error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+            },
+        });
+
+        const sent = sendDrawWSMessage(message);
+        if (!sent) {
+            const pending = pendingDrawActions.get(actionId);
+            if (pending) {
+                pendingDrawActions.delete(actionId);
+                pending.reject(new Error("Realtime connection is not ready."));
+            }
+        }
+    });
+}
+
+function applyDrawStateSync(state) {
+    if (!state || typeof state !== "object") return;
+
+    const incomingVersion = Number(state.room_version || 0);
+    if (incomingVersion && incomingVersion < latestDrawRoomVersion) {
+        return;
+    }
+    if (incomingVersion) {
+        latestDrawRoomVersion = incomingVersion;
+    }
+
+    currentDrawRoomData = state;
+    drawIsHost = currentDrawPlayerId === state.host_id;
+
+    const signature = buildDrawStateSignature(state);
+    if (signature === lastRenderedDrawSignature) {
+        updateDrawLiveTimer(state);
+        return;
+    }
+
+    lastRenderedDrawSignature = signature;
+    renderDrawState(state);
 }
 
 async function loadDrawCategories() {
@@ -914,27 +1045,11 @@ async function toggleDrawCategory(categoryKey) {
         nextCategories = [...selectedDrawCategories, categoryKey];
     }
 
-    const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/categories`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            host_id: currentDrawPlayerId,
-            categories: nextCategories,
-        }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        showDrawError(data.detail || "تعذر تحديث التصنيفات.");
-        return;
+    try {
+        await sendDrawWSAction("update_categories", { categories: nextCategories });
+    } catch (error) {
+        showDrawError(error.message || "تعذر تحديث التصنيفات.");
     }
-
-    currentDrawRoomData = data;
-    selectedDrawCategories = [...(data.categories || [])];
-    drawIsHost = currentDrawPlayerId === data.host_id;
-    lastRenderedDrawSignature = null;
-    renderDrawWaitingRoom(data);
 }
 
 function updateDrawCategoryButtonsState() {
@@ -1056,6 +1171,7 @@ async function createDrawRoom() {
     currentDrawPlayerId = data.host_id;
     currentDrawPlayerName = hostName;
     currentDrawRoomData = data;
+    latestDrawRoomVersion = Number(data.room_version || 0);
     drawIsHost = true;
     selectedDrawCategories = [...(data.categories || [])];
     lastRenderedDrawSignature = null;
@@ -1101,6 +1217,7 @@ async function joinDrawRoom() {
     currentDrawPlayerId = joinedPlayer.id;
     currentDrawPlayerName = name;
     currentDrawRoomData = data;
+    latestDrawRoomVersion = Number(data.room_version || 0);
     drawIsHost = currentDrawPlayerId === data.host_id;
     lastRenderedDrawSignature = null;
 
@@ -1118,43 +1235,20 @@ async function startDrawGame() {
         return;
     }
 
-    const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/start`, {
-        method: "POST",
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        showDrawError(data.detail || "تعذر بدء اللعبة.");
-        return;
+    try {
+        await sendDrawWSAction("start_game");
+    } catch (error) {
+        showDrawError(error.message || "تعذر بدء اللعبة.");
     }
-
-    currentDrawRoomData = data;
-    lastRenderedDrawSignature = null;
-    renderDrawState(data);
 }
 
 async function selectDrawWord(chosenWordEn) {
-    const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/select-word`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            player_id: currentDrawPlayerId,
-            chosen_word_en: chosenWordEn,
-        }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        showDrawError(data.detail || "تعذر اختيار الكلمة.");
-        return;
+    try {
+        await sendDrawWSAction("select_word", { chosen_word_en: chosenWordEn });
+        clearCanvasLocally();
+    } catch (error) {
+        showDrawError(error.message || "تعذر اختيار الكلمة.");
     }
-
-    currentDrawRoomData = data;
-    lastRenderedDrawSignature = null;
-    clearCanvasLocally();
-    renderDrawState(data);
 }
 
 function handleDrawGuessEnter(event) {
@@ -1180,25 +1274,12 @@ function sendDrawGuess() {
 }
 
 async function advanceDrawRound() {
-    const response = await fetch(`/api/draw-guess/rooms/${currentDrawRoomCode}/advance`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            player_id: currentDrawPlayerId,
-        }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        showDrawError(data.detail || "تعذر الانتقال للجولة التالية.");
-        return;
+    try {
+        await sendDrawWSAction("advance_round");
+        clearCanvasLocally();
+    } catch (error) {
+        showDrawError(error.message || "تعذر الانتقال للجولة التالية.");
     }
-
-    currentDrawRoomData = data;
-    lastRenderedDrawSignature = null;
-    clearCanvasLocally();
-    renderDrawState(data);
 }
 
 async function restartDrawGame() {
@@ -1324,27 +1405,15 @@ async function refreshDrawRoomState() {
     const data = await response.json();
     if (!ensureCurrentDrawPlayerStillInRoom(data)) return;
 
-    currentDrawRoomData = data;
-    drawIsHost = currentDrawPlayerId === data.host_id;
-
     if (!drawWS || (drawWS.readyState !== WebSocket.OPEN && drawWS.readyState !== WebSocket.CONNECTING)) {
         connectDrawWS(currentDrawRoomCode);
     }
-
-    const signature = buildDrawStateSignature(data);
-
-    if (signature === lastRenderedDrawSignature) {
-        updateDrawLiveTimer(data);
-        return;
-    }
-
-    lastRenderedDrawSignature = signature;
-    renderDrawState(data);
+    applyDrawStateSync(data);
 }
 
 function buildDrawStateSignature(data) {
     const playersSignature = data.players
-        .map((p) => `${p.id}:${p.score}`)
+        .map((p) => `${p.id}:${p.score}:${p.character_id || ""}`)
         .join("|");
 
     return JSON.stringify({
@@ -1885,6 +1954,10 @@ function clearDrawLocalState() {
     selectedDrawTimer = 60;
     selectedDrawCharacter = "char1";
     drawStrokeHistory = [];
+    latestDrawRoomVersion = 0;
+    drawActionCounter = 0;
+    pendingDrawActions.forEach((pending) => pending.reject(new Error("Room state reset.")));
+    pendingDrawActions.clear();
 
     closeDrawWS({ shouldReconnect: false });
 }

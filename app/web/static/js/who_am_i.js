@@ -1476,3 +1476,475 @@ async function maybeAutoJoinWhoAmIInvite() {
 document.addEventListener("DOMContentLoaded", () => {
     maybeAutoJoinWhoAmIInvite();
 });
+
+let whoAmIWS = null;
+let whoAmIWSRoomCode = null;
+let whoAmIWSShouldReconnect = false;
+let whoAmIWSReconnectTimer = null;
+let whoAmIActionCounter = 0;
+let latestWhoAmIRoomVersion = 0;
+const pendingWhoAmIActions = new Map();
+
+function nextWhoAmIActionId() {
+    whoAmIActionCounter += 1;
+    return `whoami-action-${Date.now()}-${whoAmIActionCounter}`;
+}
+
+function sendWhoAmIWSMessage(payload) {
+    if (!whoAmIWS || whoAmIWS.readyState !== WebSocket.OPEN) return false;
+    try {
+        whoAmIWS.send(JSON.stringify(payload));
+        return true;
+    } catch (error) {
+        console.error("WhoAmI WS send failed:", error);
+        return false;
+    }
+}
+
+function sendWhoAmIWSAction(actionType, payload = {}) {
+    if (!whoAmIWS || whoAmIWS.readyState !== WebSocket.OPEN) {
+        return Promise.reject(new Error("Realtime connection is not ready."));
+    }
+
+    const actionId = nextWhoAmIActionId();
+    const message = {
+        type: actionType,
+        action_id: actionId,
+        player_id: currentPlayerId,
+        ...payload,
+    };
+
+    const timeoutId = setTimeout(() => {
+        const pending = pendingWhoAmIActions.get(actionId);
+        if (!pending) return;
+        pendingWhoAmIActions.delete(actionId);
+        pending.reject(new Error("Action timed out."));
+    }, 8000);
+
+    return new Promise((resolve, reject) => {
+        pendingWhoAmIActions.set(actionId, {
+            resolve: () => {
+                clearTimeout(timeoutId);
+                resolve();
+            },
+            reject: (error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+            },
+        });
+
+        const sent = sendWhoAmIWSMessage(message);
+        if (!sent) {
+            const pending = pendingWhoAmIActions.get(actionId);
+            if (pending) {
+                pendingWhoAmIActions.delete(actionId);
+                pending.reject(new Error("Realtime connection is not ready."));
+            }
+        }
+    });
+}
+
+function clearWhoAmIWSReconnectTimer() {
+    if (!whoAmIWSReconnectTimer) return;
+    clearTimeout(whoAmIWSReconnectTimer);
+    whoAmIWSReconnectTimer = null;
+}
+
+function scheduleWhoAmIWSReconnect(roomCode) {
+    if (!whoAmIWSShouldReconnect || !roomCode || !currentPlayerId || whoAmIWSReconnectTimer) return;
+    whoAmIWSReconnectTimer = setTimeout(() => {
+        whoAmIWSReconnectTimer = null;
+        if (!whoAmIWSShouldReconnect || currentRoomCode !== roomCode || !currentPlayerId) return;
+        connectWhoAmIWS(roomCode);
+    }, 1500);
+}
+
+function closeWhoAmIWS({ shouldReconnect = false } = {}) {
+    whoAmIWSShouldReconnect = shouldReconnect;
+    clearWhoAmIWSReconnectTimer();
+
+    if (!whoAmIWS) {
+        whoAmIWSRoomCode = null;
+        return;
+    }
+
+    const socket = whoAmIWS;
+    whoAmIWS = null;
+    whoAmIWSRoomCode = null;
+
+    socket.onopen = null;
+    socket.onerror = null;
+    socket.onmessage = null;
+    socket.onclose = null;
+
+    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+        try {
+            socket.close();
+        } catch (error) {
+            console.error("WhoAmI WS close failed:", error);
+        }
+    }
+}
+
+async function applyWhoAmIStateSync(state) {
+    if (!state || typeof state !== "object") return;
+
+    const incomingVersion = Number(state.room_version || 0);
+    if (incomingVersion && incomingVersion < latestWhoAmIRoomVersion) return;
+    if (incomingVersion) latestWhoAmIRoomVersion = incomingVersion;
+
+    currentRoomData = state;
+    isHost = currentPlayerId === state.host_id;
+
+    if (!ensureCurrentWhoAmIPlayerStillInRoom(state)) return;
+
+    await refreshPlayerKnowledge();
+
+    const me = state.players.find((player) => player.id === currentPlayerId);
+    if (me && me.has_guessed_correctly && !cachedIdentity) {
+        await fetchMySolvedIdentity();
+    }
+
+    if (!shouldRenderRoom(state)) return;
+
+    if (state.ended) {
+        renderGameOver(state);
+        return;
+    }
+    if (!state.started) {
+        renderWaitingRoom(state);
+        return;
+    }
+    if (state.reveal_phase_active) {
+        await renderRevealScreen(state);
+        return;
+    }
+    renderPlayScreen(state);
+}
+
+function connectWhoAmIWS(roomCode) {
+    if (!roomCode || !currentPlayerId) return;
+    if (
+        whoAmIWS &&
+        whoAmIWSRoomCode === roomCode &&
+        (whoAmIWS.readyState === WebSocket.OPEN || whoAmIWS.readyState === WebSocket.CONNECTING)
+    ) {
+        return;
+    }
+
+    closeWhoAmIWS({ shouldReconnect: false });
+    whoAmIWSShouldReconnect = true;
+    clearWhoAmIWSReconnectTimer();
+
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const wsUrl = `${protocol}://${window.location.host}/api/who-am-i/ws/${roomCode}?player_id=${encodeURIComponent(currentPlayerId)}`;
+
+    let socket;
+    try {
+        socket = new WebSocket(wsUrl);
+    } catch (error) {
+        console.error("WhoAmI WS create failed:", error);
+        scheduleWhoAmIWSReconnect(roomCode);
+        return;
+    }
+
+    whoAmIWS = socket;
+    whoAmIWSRoomCode = roomCode;
+
+    socket.onopen = () => {
+        if (whoAmIWS !== socket) return;
+        clearWhoAmIWSReconnectTimer();
+        sendWhoAmIWSMessage({
+            type: "sync_request",
+            action_id: nextWhoAmIActionId(),
+            player_id: currentPlayerId,
+        });
+    };
+
+    socket.onmessage = async (event) => {
+        if (whoAmIWS !== socket) return;
+        try {
+            const data = JSON.parse(event.data);
+
+            if (data.type === "state_sync" && data.state) {
+                await applyWhoAmIStateSync(data.state);
+                return;
+            }
+
+            if (data.type === "action_ack" && data.action_id) {
+                const pending = pendingWhoAmIActions.get(data.action_id);
+                if (pending) {
+                    pendingWhoAmIActions.delete(data.action_id);
+                    pending.resolve();
+                }
+                return;
+            }
+
+            if (data.type === "action_error") {
+                if (data.action_id) {
+                    const pending = pendingWhoAmIActions.get(data.action_id);
+                    if (pending) {
+                        pendingWhoAmIActions.delete(data.action_id);
+                        pending.reject(new Error(data.detail || "Action failed."));
+                    }
+                }
+                if (data.detail) showWhoAmIError(data.detail);
+            }
+        } catch (error) {
+            console.error("WhoAmI WS message error:", error);
+        }
+    };
+
+    socket.onclose = () => {
+        if (whoAmIWS === socket) {
+            whoAmIWS = null;
+            whoAmIWSRoomCode = null;
+        }
+        if (whoAmIWSShouldReconnect && currentRoomCode === roomCode && currentPlayerId) {
+            scheduleWhoAmIWSReconnect(roomCode);
+        }
+    };
+
+    socket.onerror = (error) => {
+        console.error("WhoAmI WS error:", error);
+    };
+}
+
+const originalWhoAmICreateRoom = createRoom;
+createRoom = async function() {
+    await originalWhoAmICreateRoom();
+    if (currentRoomCode && currentPlayerId) connectWhoAmIWS(currentRoomCode);
+};
+
+const originalWhoAmIJoinRoom = joinRoom;
+joinRoom = async function() {
+    await originalWhoAmIJoinRoom();
+    if (currentRoomCode && currentPlayerId) connectWhoAmIWS(currentRoomCode);
+};
+
+const originalWhoAmIUpdateCharacter = updateWhoAmILobbyCharacter;
+updateWhoAmILobbyCharacter = async function(characterId) {
+    if (currentRoomCode && currentPlayerId && whoAmIWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendWhoAmIWSAction("update_character", { character_id: characterId });
+            selectedCharacter = characterId;
+            localStorage.setItem("whoami_character_id", selectedCharacter);
+            return;
+        } catch (error) {
+            showWhoAmIError(error.message || "Unable to update character.");
+            return;
+        }
+    }
+    await originalWhoAmIUpdateCharacter(characterId);
+};
+
+toggleCategory = async function(categoryKey) {
+    if (!isHost || currentRoomData?.started) return;
+
+    const isSelected = selectedCategories.includes(categoryKey);
+    let nextCategories;
+
+    if (isSelected) {
+        nextCategories = selectedCategories.filter((c) => c !== categoryKey);
+    } else {
+        if (selectedCategories.length >= MAX_CATEGORIES) {
+            showWhoAmIError(`يمكنك اختيار ${MAX_CATEGORIES} تصنيفات كحد أقصى`);
+            return;
+        }
+        nextCategories = [...selectedCategories, categoryKey];
+    }
+
+    if (whoAmIWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendWhoAmIWSAction("update_categories", { categories: nextCategories });
+            return;
+        } catch (error) {
+            showWhoAmIError(error.message || "تعذر تحديث التصنيفات.");
+            return;
+        }
+    }
+
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/categories`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            host_id: currentPlayerId,
+            categories: nextCategories
+        })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "تعذر تحديث التصنيفات.");
+        return;
+    }
+    await applyWhoAmIStateSync(data);
+};
+
+startGame = async function() {
+    if (!currentRoomData?.categories?.length) {
+        showWhoAmIError("اختر تصنيفًا واحدًا على الأقل قبل بدء اللعبة.");
+        return;
+    }
+    if (whoAmIWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendWhoAmIWSAction("start_game");
+            return;
+        } catch (error) {
+            showWhoAmIError(error.message || "تعذر بدء اللعبة.");
+            return;
+        }
+    }
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/start`, { method: "POST" });
+    const data = await response.json();
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "تعذر بدء اللعبة.");
+        return;
+    }
+    await applyWhoAmIStateSync(data);
+};
+
+advanceRevealPhase = async function() {
+    if (whoAmIWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendWhoAmIWSAction("confirm_reveal");
+            return;
+        } catch (error) {
+            showWhoAmIError(error.message || "تعذر الانتقال للاعب التالي.");
+            return;
+        }
+    }
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/confirm-reveal`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ player_id: currentPlayerId })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "تعذر الانتقال للاعب التالي.");
+        return;
+    }
+    await applyWhoAmIStateSync(data);
+};
+
+submitGuess = async function() {
+    const guessInput = document.getElementById("guessInput");
+    const guessText = guessInput?.value?.trim() || "";
+    if (!guessText) {
+        showWhoAmIError("أدخل تخمينًا أولًا.");
+        return;
+    }
+
+    if (whoAmIWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendWhoAmIWSAction("submit_guess", { guess_text: guessText });
+            if (guessInput) guessInput.value = "";
+            currentGuessDraft = "";
+            return;
+        } catch (error) {
+            showWhoAmIError(error.message || "تعذر إرسال التخمين.");
+            return;
+        }
+    }
+
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/guess`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ player_id: currentPlayerId, guess_text: guessText })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "تعذر إرسال التخمين.");
+        return;
+    }
+    if (guessInput) guessInput.value = "";
+    currentGuessDraft = "";
+    await applyWhoAmIStateSync(data);
+};
+
+restartGame = async function() {
+    const categories = selectedCategories.length > 0
+        ? selectedCategories
+        : currentRoomData?.categories || [];
+    if (categories.length === 0) {
+        showWhoAmIError("اختر تصنيفًا واحدًا على الأقل!");
+        return;
+    }
+
+    if (whoAmIWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendWhoAmIWSAction("restart_game", { categories });
+            return;
+        } catch (error) {
+            showWhoAmIError(error.message || "تعذر إعادة اللعبة.");
+            return;
+        }
+    }
+
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/restart`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ categories })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "تعذر إعادة اللعبة.");
+        return;
+    }
+    await applyWhoAmIStateSync(data);
+};
+
+removeWhoAmIPlayer = async function(playerIdToRemove) {
+    if (whoAmIWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendWhoAmIWSAction("remove_player", { player_id_to_remove: playerIdToRemove });
+            return;
+        } catch (error) {
+            showWhoAmIError(error.message || "تعذر حذف اللاعب من الغرفة.");
+            return;
+        }
+    }
+
+    const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/remove-player`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            host_id: currentPlayerId,
+            player_id_to_remove: playerIdToRemove
+        })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        showWhoAmIError(data.detail || "تعذر حذف اللاعب من الغرفة.");
+        return;
+    }
+    await applyWhoAmIStateSync(data);
+};
+
+const originalWhoAmILeaveCurrentRoom = leaveCurrentRoom;
+leaveCurrentRoom = async function() {
+    if (whoAmIWS?.readyState === WebSocket.OPEN) {
+        try {
+            await sendWhoAmIWSAction("leave");
+        } catch (error) {
+            console.warn("WhoAmI WS leave failed, falling back to REST:", error);
+        }
+    }
+    closeWhoAmIWS({ shouldReconnect: false });
+    await originalWhoAmILeaveCurrentRoom();
+};
+
+const originalWhoAmIClearLocalState = clearLocalGameState;
+clearLocalGameState = function() {
+    closeWhoAmIWS({ shouldReconnect: false });
+    latestWhoAmIRoomVersion = 0;
+    originalWhoAmIClearLocalState();
+};
+
+const originalWhoAmIRefreshRoomState = refreshRoomState;
+refreshRoomState = async function() {
+    if (currentRoomCode && currentPlayerId) {
+        connectWhoAmIWS(currentRoomCode);
+    }
+    if (whoAmIWS?.readyState === WebSocket.OPEN) return;
+    await originalWhoAmIRefreshRoomState();
+};

@@ -88,6 +88,7 @@ class BluffAnswerOptionView(BaseModel):
 
 class BluffRoomStateResponse(BaseModel):
     room_code: str
+    room_version: int
     host_id: str
     max_player_count: int
     total_rounds: int

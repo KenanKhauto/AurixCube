@@ -182,7 +182,7 @@ class DrawGuessGameService:
         room = self._get_room(room_code)
         if player_id in room.players:
             room.players[player_id].last_seen = datetime.now()
-            self._save_room(room)
+            self._save_room(room, bump_version=False)
 
     def delete_room(self, room_code: str, player_id: str) -> None:
         room = self._get_room(room_code)
@@ -593,12 +593,15 @@ class DrawGuessGameService:
             raise RoomNotFoundError("Room not found.")
         return self._deserialize_room(raw_room)
 
-    def _save_room(self, room: DrawGuessRoom) -> None:
+    def _save_room(self, room: DrawGuessRoom, bump_version: bool = True) -> None:
+        if bump_version:
+            room.room_version += 1
         self.room_repository.save_room(room.room_code, self._serialize_room(room))
 
     def _serialize_room(self, room: DrawGuessRoom) -> dict:
         return {
             "room_code": room.room_code,
+            "room_version": room.room_version,
             "host_id": room.host_id,
             "max_player_count": room.max_player_count,
             "total_rounds": room.total_rounds,
@@ -677,6 +680,7 @@ class DrawGuessGameService:
         room = DrawGuessRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],
+            room_version=data.get("room_version", 0),
             max_player_count=data["max_player_count"],
             total_rounds=data["total_rounds"],
             categories=data.get("categories", []),
