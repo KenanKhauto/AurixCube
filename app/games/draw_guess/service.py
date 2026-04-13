@@ -8,6 +8,7 @@ import time
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
+from rapidfuzz import fuzz
 
 from app.core.exceptions import PlayerNotFoundError, RoomNotFoundError
 from app.core.utils import generate_room_code
@@ -21,6 +22,8 @@ from app.games.draw_guess.domain import (
 )
 from app.repositories.room_repository import RoomRepository
 from app.services.room_storage import get_room_repository
+
+CLOSE_GUESS_THRESHOLD = 88
 
 
 class DrawGuessGameService:
@@ -288,6 +291,7 @@ class DrawGuessGameService:
 
         player = room.players[player_id]
         is_correct = self._is_correct_guess(room, guess_text)
+        is_close = (not is_correct) and self.is_close_guess(room, guess_text)
 
         room.guesses.append(
             DrawGuessGuessMessage(
@@ -295,6 +299,7 @@ class DrawGuessGameService:
                 player_name=player.name,
                 text=guess_text,
                 is_correct=is_correct,
+                is_public=not is_close,
             )
         )
 
@@ -522,15 +527,42 @@ class DrawGuessGameService:
         if room.current_word is None:
             return False
 
+        valid_answers = self._build_valid_answers(room)
+
+        return self._normalize_text(guess_text) in valid_answers
+
+    def is_close_guess(self, room: DrawGuessRoom, guess_text: str) -> bool:
+        if room.current_word is None:
+            return False
+
+        normalized_guess = self._normalize_text(guess_text)
+        if len(normalized_guess) < 3:
+            return False
+
+        valid_answers = self._build_valid_answers(room)
+        if normalized_guess in valid_answers:
+            return False
+
+        best_score = 0
+        for answer in valid_answers:
+            score = fuzz.ratio(normalized_guess, answer)
+            if score > best_score:
+                best_score = score
+
+        return best_score >= CLOSE_GUESS_THRESHOLD
+
+    def _build_valid_answers(self, room: DrawGuessRoom) -> set[str]:
+        if room.current_word is None:
+            return set()
+
         valid_answers = {
             self._normalize_text(room.current_word.word_en),
             self._normalize_text(room.current_word.word_ar),
         }
-
         valid_answers.update(self._normalize_text(x) for x in room.current_word.aliases_en)
         valid_answers.update(self._normalize_text(x) for x in room.current_word.aliases_ar)
 
-        return self._normalize_text(guess_text) in valid_answers
+        return {answer for answer in valid_answers if answer}
 
     def _normalize_text(self, text: str) -> str:
         return " ".join(text.strip().lower().split())
@@ -635,6 +667,7 @@ class DrawGuessGameService:
                     "player_name": g.player_name,
                     "text": g.text,
                     "is_correct": g.is_correct,
+                    "is_public": g.is_public,
                 }
                 for g in room.guesses
             ],
@@ -714,6 +747,7 @@ class DrawGuessGameService:
                     player_name=item["player_name"],
                     text=item["text"],
                     is_correct=item.get("is_correct", False),
+                    is_public=item.get("is_public", True),
                 )
             )
 

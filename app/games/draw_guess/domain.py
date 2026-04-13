@@ -33,6 +33,7 @@ class DrawGuessGuessMessage:
     player_name: str
     text: str
     is_correct: bool = False
+    is_public: bool = True
 
 
 @dataclass

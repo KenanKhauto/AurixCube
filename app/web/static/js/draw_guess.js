@@ -493,6 +493,10 @@ function legacyConnectDrawWS(roomCode) {
                 renderDrawGuessMessage(data);
             }
 
+            if (data.type === "guess_hint_private") {
+                renderDrawPrivateHintMessage(data.text || "تخمينك قريب من الكلمة!");
+            }
+
             if (data.type === "clear") {
                 clearCanvasLocally();
             }
@@ -653,6 +657,10 @@ function connectDrawWS(roomCode) {
 
             if (data.type === "guess") {
                 renderDrawGuessMessage(data);
+            }
+
+            if (data.type === "guess_hint_private") {
+                renderDrawPrivateHintMessage(data.text || "تخمينك قريب من الكلمة!");
             }
 
             if (data.type === "clear") {
@@ -1723,6 +1731,18 @@ function renderDrawScoreboard(players, containerId, showActions = false) {
 function getSelectedDisplayedWord(data, language) {
     if (language === "ar") return data.current_word_ar || null;
     return data.current_word_en || null;
+}
+
+function renderDrawPrivateHintMessage(text) {
+    const container = document.getElementById("drawGuessFeed");
+    if (!container) return;
+
+    const div = document.createElement("div");
+    div.className = "draw-guess-message";
+    div.classList.add("close");
+    div.textContent = text;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
 }
 
 function hashStringFNV1a(input) {

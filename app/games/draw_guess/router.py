@@ -85,6 +85,7 @@ def build_room_response(room) -> DrawGuessRoomStateResponse:
                 is_correct=g.is_correct,
             )
             for g in room.guesses
+            if g.is_public
         ],
         strokes=[
             DrawGuessStrokeView(
@@ -329,14 +330,34 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                     )
 
                     last_guess = room.guesses[-1]
-
-                    await manager.broadcast(room_code, {
-                        "type": "guess",
-                        "player_name": last_guess.player_name,
-                        "text": last_guess.text,
-                        "is_correct": last_guess.is_correct,
-                        "player_id": last_guess.player_id
-                    })
+                    if last_guess.is_public:
+                        await manager.broadcast(room_code, {
+                            "type": "guess",
+                            "player_name": last_guess.player_name,
+                            "text": last_guess.text,
+                            "is_correct": last_guess.is_correct,
+                            "player_id": last_guess.player_id
+                        })
+                    else:
+                        await manager.send_to_player(
+                            room_code=room_code,
+                            player_id=last_guess.player_id,
+                            message={
+                                "type": "guess",
+                                "player_name": last_guess.player_name,
+                                "text": last_guess.text,
+                                "is_correct": last_guess.is_correct,
+                                "player_id": last_guess.player_id
+                            },
+                        )
+                        await manager.send_to_player(
+                            room_code=room_code,
+                            player_id=last_guess.player_id,
+                            message={
+                                "type": "guess_hint_private",
+                                "text": "تخمينك قريب من الكلمة!",
+                            },
+                        )
                 except (ValueError, KeyError, TypeError) as e:
                     logger.warning("Draw WS invalid guess payload room=%s player=%s error=%s payload=%s", room_code, player_id or "unknown", e, data)
 

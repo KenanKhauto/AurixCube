@@ -130,6 +130,33 @@ class RoomConnectionManager:
                 self.room_connection_count(room_code),
             )
 
+    async def send_to_player(self, room_code: str, player_id: str, message: dict):
+        websocket = self.rooms.get(room_code, {}).get(player_id)
+        if websocket is None:
+            return
+
+        try:
+            await websocket.send_json(message)
+        except WebSocketDisconnect:
+            logger.warning("Draw WS private send disconnect room=%s player=%s", room_code, player_id)
+            self._remove_socket_reference(room_code, websocket, expected_player_id=player_id)
+        except RuntimeError as exc:
+            logger.warning(
+                "Draw WS private send runtime failure room=%s player=%s error=%s",
+                room_code,
+                player_id,
+                exc,
+            )
+            self._remove_socket_reference(room_code, websocket, expected_player_id=player_id)
+        except Exception as exc:
+            logger.exception(
+                "Draw WS private send failed room=%s player=%s error=%s",
+                room_code,
+                player_id,
+                exc,
+            )
+            self._remove_socket_reference(room_code, websocket, expected_player_id=player_id)
+
     def room_connection_count(self, room_code: str) -> int:
         return len(self.rooms.get(room_code, {})) + len(self.anonymous_rooms.get(room_code, []))
 
