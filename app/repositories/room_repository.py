@@ -44,3 +44,10 @@ class RoomRepository(ABC):
             room_code: Unique room code.
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def list_rooms(self) -> dict[str, dict]:
+        """
+        Return all currently stored rooms.
+        """
+        raise NotImplementedError

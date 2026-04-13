@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from app.repositories.room_repository import RoomRepository
@@ -21,7 +22,12 @@ class InMemoryRoomRepository(RoomRepository):
         """
         Save or update a room in memory.
         """
-        self._rooms[room_code] = room_data
+        now_iso = datetime.now(timezone.utc).isoformat()
+        existing = self._rooms.get(room_code, {})
+        payload = dict(room_data)
+        payload["_meta_created_at"] = existing.get("_meta_created_at", now_iso)
+        payload["_meta_updated_at"] = now_iso
+        self._rooms[room_code] = payload
 
     def get_room(self, room_code: str) -> Optional[dict]:
         """
@@ -34,3 +40,9 @@ class InMemoryRoomRepository(RoomRepository):
         Delete a room from memory.
         """
         self._rooms.pop(room_code, None)
+
+    def list_rooms(self) -> dict[str, dict]:
+        """
+        Return all rooms currently in memory.
+        """
+        return dict(self._rooms)

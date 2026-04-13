@@ -17,6 +17,7 @@ from app.games.undercover.schemas import (
     UpdateCategoriesRequest,
 )
 from app.games.undercover.service import UndercoverGameService
+from app.services.analytics import track_event_async
 
 router = APIRouter()
 service = UndercoverGameService()
@@ -74,7 +75,17 @@ def create_room(payload: CreateRoomRequest):
             undercover_count=payload.undercover_count,
             categories=payload.categories,
         )
-        return build_room_response(room)
+        response = build_room_response(room)
+        track_event_async(
+            distinct_id=f"room_host:{room.host_id}",
+            event="room_created",
+            properties={
+                "room_code": room.room_code,
+                "game_type": "undercover",
+                "max_player_count": room.max_player_count,
+            },
+        )
+        return response
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -94,7 +105,17 @@ def start_room(room_code: str):
     """Start the room."""
     try:
         room = service.start_game(room_code)
-        return build_room_response(room)
+        response = build_room_response(room)
+        track_event_async(
+            distinct_id=f"room_host:{room.host_id}",
+            event="game_started",
+            properties={
+                "room_code": room.room_code,
+                "game_type": "undercover",
+                "player_count": len(room.players),
+            },
+        )
+        return response
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

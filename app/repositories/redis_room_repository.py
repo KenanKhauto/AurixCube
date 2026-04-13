@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from typing import Optional
 
 import redis
@@ -46,7 +47,12 @@ class RedisRoomRepository(RoomRepository):
         Save or update a room in Redis.
         """
         key = self._make_key(room_code)
-        payload = json.dumps(room_data)
+        existing = self.get_room(room_code) or {}
+        now_iso = datetime.now(timezone.utc).isoformat()
+        payload_data = dict(room_data)
+        payload_data["_meta_created_at"] = existing.get("_meta_created_at", now_iso)
+        payload_data["_meta_updated_at"] = now_iso
+        payload = json.dumps(payload_data)
         self._client.set(name=key, value=payload, ex=self._ttl_seconds)
 
     def get_room(self, room_code: str) -> Optional[dict]:
@@ -65,3 +71,19 @@ class RedisRoomRepository(RoomRepository):
         """
         key = self._make_key(room_code)
         self._client.delete(key)
+
+    def list_rooms(self) -> dict[str, dict]:
+        """
+        Return all rooms currently stored in Redis with this key prefix.
+        """
+        rooms: dict[str, dict] = {}
+        for key in self._client.scan_iter(match=f"{self._key_prefix}*"):
+            payload = self._client.get(key)
+            if payload is None:
+                continue
+            room_code = key.replace(self._key_prefix, "", 1)
+            try:
+                rooms[room_code] = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+        return rooms

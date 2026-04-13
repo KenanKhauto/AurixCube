@@ -27,6 +27,7 @@ from app.games.who_am_i.schemas import (
 )
 from app.games.who_am_i.service import WhoAmIService
 from app.games.who_am_i.websocket_manager import manager
+from app.services.analytics import track_event_async
 
 router = APIRouter()
 service = WhoAmIService()
@@ -87,7 +88,18 @@ def create_room(
             categories=payload.categories,
             character_id=payload.character_id,
         )
-        return build_room_response(room)
+        response = build_room_response(room)
+        distinct_id = f"user:{current_user.id}" if current_user else f"room_host:{room.host_id}"
+        track_event_async(
+            distinct_id=distinct_id,
+            event="room_created",
+            properties={
+                "room_code": room.room_code,
+                "game_type": "who_am_i",
+                "max_player_count": room.max_player_count,
+            },
+        )
+        return response
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -183,7 +195,17 @@ def start_room(room_code: str):
     """Start the room."""
     try:
         room = service.start_game(room_code)
-        return build_room_response(room)
+        response = build_room_response(room)
+        track_event_async(
+            distinct_id=f"room_host:{room.host_id}",
+            event="game_started",
+            properties={
+                "room_code": room.room_code,
+                "game_type": "who_am_i",
+                "player_count": len(room.players),
+            },
+        )
+        return response
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

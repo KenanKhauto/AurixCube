@@ -4,16 +4,23 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user, get_current_user_optional
+from app.auth.dependencies import get_current_admin, get_current_user, get_current_user_optional
 from app.auth.service import AuthService
+from app.config import settings
 from app.db.models.user import User
 from app.db.session import get_db
 from app.games.registry import GAMES
+from app.games.bluff.websocket_manager import manager as bluff_ws_manager
+from app.games.draw_guess.websocket_manager import manager as draw_ws_manager
+from app.games.who_am_i.websocket_manager import manager as who_am_i_ws_manager
+from app.services.room_storage import get_room_repository
 
 
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/web/templates")
+templates.env.globals["posthog_api_key"] = settings.posthog_api_key
+templates.env.globals["posthog_host"] = settings.posthog_host
 
 
 @router.get("/")
@@ -161,3 +168,84 @@ def draw_guess_page(
             "theme_class": game.get("theme_class", ""),
         },
     )
+
+
+def _infer_game_type(room_data: dict) -> str:
+    if "undercover_count" in room_data:
+        return "undercover"
+    if "reveal_phase_active" in room_data:
+        return "who_am_i"
+    if "drawer_order" in room_data or "current_drawer_id" in room_data:
+        return "draw_guess"
+    if "answer_options" in room_data and "total_rounds" in room_data:
+        return "bluff"
+    return "unknown"
+
+
+def _room_status(room_data: dict) -> str:
+    if room_data.get("ended"):
+        return f"ended:{room_data.get('end_reason') or 'unknown'}"
+    if not room_data.get("started"):
+        return "waiting"
+    return room_data.get("phase") or "active"
+
+
+def _build_live_room_snapshot() -> dict:
+    repository = get_room_repository()
+    raw_rooms = repository.list_rooms()
+
+    room_items: list[dict] = []
+    for room_code, room_data in raw_rooms.items():
+        players = list((room_data.get("players") or {}).values())
+
+        player_names = [player.get("name") for player in players if player.get("name")]
+        usernames = [player.get("username") for player in players if player.get("username")]
+
+        room_items.append(
+            {
+                "room_code": room_code,
+                "game_type": _infer_game_type(room_data),
+                "status": _room_status(room_data),
+                "user_count": len(players),
+                "player_names": player_names,
+                "usernames": usernames,
+                "created_at": room_data.get("_meta_created_at"),
+                "last_activity_at": room_data.get("_meta_updated_at"),
+            }
+        )
+
+    connected_users = (
+        sum(len(room_connections) for room_connections in draw_ws_manager.rooms.values())
+        + sum(len(room_connections) for room_connections in bluff_ws_manager.rooms.values())
+        + sum(len(room_connections) for room_connections in who_am_i_ws_manager.rooms.values())
+    )
+
+    return {
+        "total_active_rooms": len(room_items),
+        "total_connected_users": connected_users,
+        "rooms": sorted(room_items, key=lambda item: item.get("last_activity_at") or "", reverse=True),
+    }
+
+
+@router.get("/admin/live")
+def admin_live_page(
+    request: Request,
+    current_user: User = Depends(get_current_admin),
+):
+    """Render the admin-only live monitoring page."""
+    return templates.TemplateResponse(
+        request,
+        "admin_live.html",
+        {
+            "request": request,
+            "current_user": current_user,
+        },
+    )
+
+
+@router.get("/api/admin/live-rooms")
+def admin_live_rooms_api(
+    current_user: User = Depends(get_current_admin),
+):
+    """Return live room monitoring data for admins."""
+    return _build_live_room_snapshot()

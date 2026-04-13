@@ -13,3 +13,4 @@ redis
 rapidfuzz
 uvicorn[standard]
 boto3
+posthog

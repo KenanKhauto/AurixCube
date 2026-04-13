@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Live Monitor{% endblock %}
+
+{% block content %}
+<div class="card glow-border" style="max-width: 1100px; margin: 20px auto;">
+    <h2 style="color:var(--primary); margin-bottom:12px;">Live Room Monitor</h2>
+    <p style="color:#aaa; margin-bottom:18px;">Admin-only operational view for active rooms.</p>
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+        <div class="card" style="min-width:220px; padding:12px;">
+            <div style="color:#888;">Total Active Rooms</div>
+            <div id="adminTotalRooms" style="font-size:24px; font-weight:700;">0</div>
+        </div>
+        <div class="card" style="min-width:220px; padding:12px;">
+            <div style="color:#888;">Connected Users (WS)</div>
+            <div id="adminConnectedUsers" style="font-size:24px; font-weight:700;">0</div>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table class="bluff-table">
+            <thead>
+                <tr>
+                    <th>Room Code</th>
+                    <th>Game</th>
+                    <th>Status</th>
+                    <th>Users</th>
+                    <th>Players</th>
+                    <th>Created</th>
+                    <th>Last Activity</th>
+                </tr>
+            </thead>
+            <tbody id="adminLiveRoomsBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function formatAdminDate(value) {
+    if (!value) return "-";
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return String(value);
+    return dt.toLocaleString();
+}
+
+function renderAdminRooms(data) {
+    document.getElementById("adminTotalRooms").textContent = data.total_active_rooms ?? 0;
+    document.getElementById("adminConnectedUsers").textContent = data.total_connected_users ?? 0;
+
+    const tbody = document.getElementById("adminLiveRoomsBody");
+    tbody.innerHTML = "";
+
+    const rooms = data.rooms || [];
+    if (!rooms.length) {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td colspan="7" style="text-align:center; color:#888;">No active rooms</td>`;
+        tbody.appendChild(row);
+        return;
+    }
+
+    rooms.forEach((room) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${room.room_code || "-"}</td>
+            <td>${room.game_type || "-"}</td>
+            <td>${room.status || "-"}</td>
+            <td>${room.user_count ?? 0}</td>
+            <td>${(room.player_names || []).join(" / ") || "-"}</td>
+            <td>${formatAdminDate(room.created_at)}</td>
+            <td>${formatAdminDate(room.last_activity_at)}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+async function refreshAdminRooms() {
+    const response = await fetch("/api/admin/live-rooms");
+    if (!response.ok) return;
+    const data = await response.json();
+    renderAdminRooms(data);
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    await refreshAdminRooms();
+    setInterval(refreshAdminRooms, 5000);
+});
+</script>
+{% endblock %}

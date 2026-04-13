@@ -26,6 +26,13 @@ class Settings(BaseModel):
     profile_image_s3_prefix: str = os.getenv("PROFILE_IMAGE_S3_PREFIX", "profile_uploads")
     profile_image_s3_public_base_url: str = os.getenv("PROFILE_IMAGE_S3_PUBLIC_BASE_URL", "")
     profile_image_s3_endpoint_url: str = os.getenv("PROFILE_IMAGE_S3_ENDPOINT_URL", "")
+    posthog_api_key: str = os.getenv("POSTHOG_API_KEY", "POSTHOG_API_KEY")
+    posthog_host: str = os.getenv("POSTHOG_HOST", "https://us.i.posthog.com")
+    admin_usernames: list[str] = [
+        username.strip().lower()
+        for username in os.getenv("ADMIN_USERNAMES", "").split(",")
+        if username.strip()
+    ]
 
 
 settings = Settings()

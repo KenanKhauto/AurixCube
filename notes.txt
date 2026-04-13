@@ -1,9 +1,4 @@
 
 --- Resolution on mobile is not working properly
 
---- fix draw guess new round, erase the white board.
---- work on a recommender system for letters with time.
 --- add new categories, what is the country. with the images.
-
---- when you invite players in the frontend and the invite goes, it should change the button to invited. And make a time until it goes back.
-ANd the popup of you invited this player successfully should go away. 

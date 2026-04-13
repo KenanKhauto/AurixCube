@@ -29,6 +29,7 @@ from app.games.draw_guess.service import DrawGuessGameService
 from fastapi import WebSocket, WebSocketDisconnect
 from app.games.draw_guess.websocket_manager import manager
 from app.games.draw_guess.domain import DrawGuessStroke
+from app.services.analytics import track_event_async
 
 
 router = APIRouter()
@@ -123,7 +124,19 @@ def create_room(
             language=payload.language,
             round_timer_seconds=payload.round_timer_seconds,
         )
-        return build_room_response(room)
+        response = build_room_response(room)
+        distinct_id = f"user:{current_user.id}" if current_user else f"room_host:{room.host_id}"
+        track_event_async(
+            distinct_id=distinct_id,
+            event="room_created",
+            properties={
+                "room_code": room.room_code,
+                "game_type": "draw_guess",
+                "max_player_count": room.max_player_count,
+                "total_rounds": room.total_rounds,
+            },
+        )
+        return response
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -164,7 +177,18 @@ def update_character(room_code: str, payload: DrawGuessUpdateCharacterRequest):
 def start_room(room_code: str):
     try:
         room = service.start_game(room_code)
-        return build_room_response(room)
+        response = build_room_response(room)
+        track_event_async(
+            distinct_id=f"room_host:{room.host_id}",
+            event="game_started",
+            properties={
+                "room_code": room.room_code,
+                "game_type": "draw_guess",
+                "player_count": len(room.players),
+                "round_timer_seconds": room.round_timer_seconds,
+            },
+        )
+        return response
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -27,6 +27,7 @@ from app.games.bluff.schemas import (
 )
 from app.games.bluff.service import BluffGameService
 from app.games.bluff.websocket_manager import manager
+from app.services.analytics import track_event_async
 
 router = APIRouter()
 service = BluffGameService()
@@ -107,7 +108,19 @@ def create_room(
             character_id=payload.character_id,
             round_timer_seconds=payload.round_timer_seconds,
         )
-        return build_room_response(room)
+        response = build_room_response(room)
+        distinct_id = f"user:{current_user.id}" if current_user else f"room_host:{room.host_id}"
+        track_event_async(
+            distinct_id=distinct_id,
+            event="room_created",
+            properties={
+                "room_code": room.room_code,
+                "game_type": "bluff",
+                "max_player_count": room.max_player_count,
+                "total_rounds": room.total_rounds,
+            },
+        )
+        return response
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -151,7 +164,18 @@ def start_room(room_code: str):
     """Start the Bluff game."""
     try:
         room = service.start_game(room_code)
-        return build_room_response(room)
+        response = build_room_response(room)
+        track_event_async(
+            distinct_id=f"room_host:{room.host_id}",
+            event="game_started",
+            properties={
+                "room_code": room.room_code,
+                "game_type": "bluff",
+                "player_count": len(room.players),
+                "round_timer_seconds": room.round_timer_seconds,
+            },
+        )
+        return response
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

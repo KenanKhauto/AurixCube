@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from starlette.requests import HTTPConnection
 
 from app.auth.service import AuthService
+from app.config import settings
 from app.db.session import get_db
 from app.db.models.user import User
 
@@ -58,3 +59,24 @@ def get_current_user(
         )
 
     return user
+
+
+def get_current_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Return the current user only if they are configured as admin.
+    """
+    if not settings.admin_usernames:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access is not configured.",
+        )
+
+    if (current_user.username or "").strip().lower() not in settings.admin_usernames:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+
+    return current_user
