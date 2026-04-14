@@ -28,7 +28,7 @@ class UndercoverGameService:
             room_repository: Repository implementation for room storage.
                 If not provided, the configured default repository is used.
         """
-        self.room_repository = room_repository or get_room_repository()
+        self.room_repository = room_repository or get_room_repository("undercover")
 
     def create_room(
         self,
@@ -580,6 +580,9 @@ class UndercoverGameService:
 
     def _deserialize_room(self, data: dict) -> UndercoverRoom:
         """Convert serialized data back to UndercoverRoom."""
+        if data.get("game_type") not in (None, "undercover"):
+            raise RoomNotFoundError("Room not found.")
+
         room = UndercoverRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],

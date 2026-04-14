@@ -26,7 +26,7 @@ class WhoAmIService:
         """
         Initialize the service with a room repository.
         """
-        self.room_repository = room_repository or get_room_repository()
+        self.room_repository = room_repository or get_room_repository("who_am_i")
 
     def create_room(
         self,
@@ -615,6 +615,9 @@ class WhoAmIService:
         """
         Convert serialized data back to WhoAmIRoom.
         """
+        if data.get("game_type") not in (None, "who_am_i"):
+            raise RoomNotFoundError("Room not found.")
+
         room = WhoAmIRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],
