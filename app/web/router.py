@@ -24,7 +24,7 @@ from app.games.bluff.service import BluffGameService
 from app.games.draw_guess.service import DrawGuessGameService
 from app.games.registry import GAMES
 from app.games.undercover.service import UndercoverGameService
-from app.games.who_am_i.service import WhoAmIGameService
+from app.games.who_am_i.service import WhoAmIService
 from app.games.bluff.websocket_manager import manager as bluff_ws_manager
 from app.games.draw_guess.websocket_manager import manager as draw_ws_manager
 from app.games.who_am_i.websocket_manager import manager as who_am_i_ws_manager
@@ -354,7 +354,7 @@ def _delete_room_as_admin(game_type: str, room_code: str) -> None:
     elif game_type == "draw_guess":
         DrawGuessGameService().delete_room(room_code, str(host_id))
     elif game_type == "who_am_i":
-        WhoAmIGameService().delete_room(room_code, str(host_id))
+        WhoAmIService().delete_room(room_code, str(host_id))
     else:
         UndercoverGameService().delete_room(room_code, str(host_id))
 
