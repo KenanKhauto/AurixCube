@@ -151,7 +151,8 @@ async function updateBluffLobbyCharacter(characterId) {
     });
     const data = await response.json();
     if (!response.ok) {
-        showBluffError(data.detail || "Unable to update character.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "Unable to update character."));
         return;
     }
     selectedBluffCharacter = characterId;
@@ -478,7 +479,8 @@ async function toggleBluffCategory(categoryKey) {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "\u062a\u0639\u0630\u0631 \u062a\u062d\u062f\u064a\u062b \u0627\u0644\u062a\u0635\u0646\u064a\u0641\u0627\u062a.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "\u062a\u0639\u0630\u0631 \u062a\u062d\u062f\u064a\u062b \u0627\u0644\u062a\u0635\u0646\u064a\u0641\u0627\u062a."));
         return;
     }
 
@@ -599,7 +601,8 @@ async function createBluffRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "حدث خطأ أثناء إنشاء الغرفة."));
         return;
     }
 
@@ -639,7 +642,8 @@ async function joinBluffRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر الانضمام إلى الغرفة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر الانضمام إلى الغرفة."));
         return;
     }
 
@@ -670,7 +674,8 @@ async function startBluffGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر بدء اللعبة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر بدء اللعبة."));
         return;
     }
 
@@ -694,7 +699,8 @@ async function selectBluffRoundCategory(category) {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر اختيار التصنيف.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر اختيار التصنيف."));
         return;
     }
 
@@ -726,7 +732,8 @@ async function submitBluffAnswer() {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر إرسال الإجابة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر إرسال الإجابة."));
         return;
     }
 
@@ -751,7 +758,8 @@ async function submitBluffPick(optionId) {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر إرسال الاختيار.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر إرسال الاختيار."));
         return;
     }
 
@@ -774,7 +782,8 @@ async function advanceBluffRound() {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر الانتقال للجولة التالية.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر الانتقال للجولة التالية."));
         return;
     }
 
@@ -814,7 +823,8 @@ async function restartBluffGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر إعادة اللعبة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر إعادة اللعبة."));
         return;
     }
 
@@ -841,7 +851,8 @@ async function leaveBluffRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر الخروج من الغرفة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر الخروج من الغرفة."));
         return;
     }
 
@@ -871,7 +882,8 @@ async function deleteBluffRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر حذف الغرفة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر حذف الغرفة."));
         return;
     }
 
@@ -900,7 +912,8 @@ async function removeBluffPlayer(playerIdToRemove) {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر حذف اللاعب.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر حذف اللاعب."));
         return;
     }
 
@@ -1462,7 +1475,8 @@ async function createBluffRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "\u062d\u062f\u062b \u062e\u0637\u0623 \u0623\u062b\u0646\u0627\u0621 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u063a\u0631\u0641\u0629.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "\u062d\u062f\u062b \u062e\u0637\u0623 \u0623\u062b\u0646\u0627\u0621 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u063a\u0631\u0641\u0629."));
         return;
     }
 
@@ -1495,7 +1509,8 @@ async function startBluffGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        showBluffError(data.detail || "\u062a\u0639\u0630\u0631 \u0628\u062f\u0621 \u0627\u0644\u0644\u0639\u0628\u0629.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "\u062a\u0639\u0630\u0631 \u0628\u062f\u0621 \u0627\u0644\u0644\u0639\u0628\u0629."));
         return;
     }
 
@@ -1676,6 +1691,7 @@ let bluffWSShouldReconnect = false;
 let bluffWSReconnectTimer = null;
 let bluffActionCounter = 0;
 let latestBluffRoomVersion = 0;
+let bluffStaleResyncCount = 0;
 const pendingBluffActions = new Map();
 
 function nextBluffActionId() {
@@ -1799,6 +1815,31 @@ function applyBluffStateSync(state) {
 
     lastRenderedBluffSignature = signature;
     renderBluffState(state);
+}
+
+function getBluffErrorMessage(data, fallbackMessage) {
+    const detail = data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (detail && typeof detail === "object" && typeof detail.message === "string" && detail.message.trim()) {
+        return detail.message;
+    }
+    return fallbackMessage;
+}
+
+function tryBluffStaleResync(response, data) {
+    if (response?.status !== 409) return false;
+    const staleState = data?.detail?.state;
+    if (!staleState || typeof staleState !== "object") return false;
+    bluffStaleResyncCount += 1;
+    console.debug("[bluff] stale resync", {
+        count: bluffStaleResyncCount,
+        roomCode: currentBluffRoomCode,
+        localVersion: latestBluffRoomVersion,
+        serverVersion: Number(staleState.room_version || 0),
+    });
+    applyBluffStateSync(staleState);
+    hideBluffError();
+    return true;
 }
 
 function connectBluffWS(roomCode) {
@@ -1953,7 +1994,8 @@ toggleBluffCategory = async function(categoryKey) {
     });
     const data = await response.json();
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر تحديث التصنيفات.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر تحديث التصنيفات."));
         return;
     }
     applyBluffStateSync(data);
@@ -1976,7 +2018,8 @@ startBluffGame = async function() {
     const response = await fetch(`/api/bluff/rooms/${currentBluffRoomCode}/start`, { method: "POST" });
     const data = await response.json();
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر بدء اللعبة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر بدء اللعبة."));
         return;
     }
     applyBluffStateSync(data);
@@ -1999,7 +2042,8 @@ selectBluffRoundCategory = async function(category) {
     });
     const data = await response.json();
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر اختيار التصنيف.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر اختيار التصنيف."));
         return;
     }
     applyBluffStateSync(data);
@@ -2031,7 +2075,8 @@ submitBluffAnswer = async function() {
     });
     const data = await response.json();
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر إرسال الإجابة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر إرسال الإجابة."));
         return;
     }
     if (input) input.value = "";
@@ -2056,7 +2101,8 @@ submitBluffPick = async function(optionId) {
     });
     const data = await response.json();
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر إرسال الاختيار.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر إرسال الاختيار."));
         return;
     }
     applyBluffStateSync(data);
@@ -2080,7 +2126,8 @@ advanceBluffRound = async function() {
     });
     const data = await response.json();
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر الانتقال للجولة التالية.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر الانتقال للجولة التالية."));
         return;
     }
     applyBluffStateSync(data);
@@ -2123,7 +2170,8 @@ restartBluffGame = async function() {
     });
     const data = await response.json();
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر إعادة اللعبة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر إعادة اللعبة."));
         return;
     }
     applyBluffStateSync(data);
@@ -2150,7 +2198,8 @@ removeBluffPlayer = async function(playerIdToRemove) {
     });
     const data = await response.json();
     if (!response.ok) {
-        showBluffError(data.detail || "تعذر حذف اللاعب من الغرفة.");
+        if (tryBluffStaleResync(response, data)) return;
+        showBluffError(getBluffErrorMessage(data, "تعذر حذف اللاعب من الغرفة."));
         return;
     }
     applyBluffStateSync(data);
@@ -2184,3 +2233,7 @@ refreshBluffRoomState = async function() {
     if (bluffWS?.readyState === WebSocket.OPEN) return;
     await originalRefreshBluffRoomState();
 };
+
+
+
+

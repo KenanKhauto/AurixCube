@@ -15,6 +15,7 @@ from app.config import settings
 from app.db.models.friend import Friend
 from app.db.models.game_invite import GameInvite
 from app.db.models.user import User
+from app.services.game_history_service import get_user_game_history
 
 GAME_INVITE_PATHS = {
     "bluff": "/games/bluff",
@@ -480,3 +481,13 @@ class AuthService:
         ).scalars().all()
 
         return list(requesters)
+
+    def get_game_history(
+        self,
+        db: Session,
+        user_id: int,
+        username: str | None = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        """Return the current user's historical game sessions."""
+        return get_user_game_history(db=db, user_id=user_id, username=username, limit=limit)

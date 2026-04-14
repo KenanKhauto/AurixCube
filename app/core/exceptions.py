@@ -15,3 +15,7 @@ class InvalidVoteError(GameError):
 
 class PlayerNotFoundError(GameError):
     """Raised when a player is not found."""
+
+
+class StaleRoomVersionError(GameError):
+    """Raised when a room update is based on an outdated room version."""

@@ -52,6 +52,7 @@ class DrawGuessRoom:
     max_player_count: int
     total_rounds: int
     categories: List[str]
+    session_id: str = ""
     language: str = "en"  # en | ar
     round_timer_seconds: int = 60
 

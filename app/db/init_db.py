@@ -1,7 +1,7 @@
 """Database initialization helper."""
 
 from app.db.base import Base
-from app.db.models import User, Friend, GameInvite  # noqa: F401
+from app.db.models import GameInvite, GameSession, GameSessionParticipant, Friend, User  # noqa: F401
 from app.db.session import engine
 from sqlalchemy import inspect, text
 

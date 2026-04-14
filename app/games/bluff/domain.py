@@ -33,6 +33,7 @@ class BluffRoom:
     max_player_count: int
     total_rounds: int
     categories: List[str]
+    session_id: str = ""
     round_timer_seconds: int = 30
     room_version: int = 0
 

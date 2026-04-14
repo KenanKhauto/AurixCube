@@ -8,11 +8,12 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from app.core.exceptions import PlayerNotFoundError, RoomNotFoundError
+from app.core.exceptions import PlayerNotFoundError, RoomNotFoundError, StaleRoomVersionError
 from app.core.utils import generate_room_code
 from app.games.who_am_i.constants import CATEGORIES
 from app.games.who_am_i.domain import WhoAmIPlayer, WhoAmIRoom
 from app.repositories.room_repository import RoomRepository
+from app.services.game_history_service import record_completed_room
 from app.services.room_storage import get_room_repository
 from app.core.guess_matcher import is_correct_guess
 
@@ -47,6 +48,7 @@ class WhoAmIService:
         room = WhoAmIRoom(
             room_code=room_code,
             host_id=host_id,
+            session_id=str(uuid.uuid4()),
             categories=categories,
             max_player_count=max_player_count,
         )
@@ -403,6 +405,7 @@ class WhoAmIService:
         room.started = False
         room.ended = False
         room.end_reason = None
+        room.session_id = str(uuid.uuid4())
 
         room.reveal_phase_active = False
         room.reveal_order = []
@@ -580,6 +583,7 @@ class WhoAmIService:
         """
         return {
             "room_code": room.room_code,
+            "session_id": room.session_id,
             "room_version": room.room_version,
             "host_id": room.host_id,
             "categories": room.categories,
@@ -621,6 +625,7 @@ class WhoAmIService:
         room = WhoAmIRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],
+            session_id=data.get("session_id") or f"who_am_i:{data['room_code']}:{data['host_id']}",
             room_version=data.get("room_version", 0),
             categories=data.get("categories", []),
             max_player_count=data["max_player_count"],
@@ -653,9 +658,19 @@ class WhoAmIService:
         return room
 
     def _save_room(self, room: WhoAmIRoom, bump_version: bool = True) -> None:
+        previous_version = int(room.room_version)
         if bump_version:
             room.room_version += 1
-        self.room_repository.save_room(room.room_code, self._serialize_room(room))
+        payload = self._serialize_room(room)
+        saved = self.room_repository.save_room(
+            room.room_code,
+            payload,
+            expected_room_version=previous_version,
+        )
+        if not saved:
+            raise StaleRoomVersionError("Room state changed. Please resync.")
+        if room.ended:
+            record_completed_room("who_am_i", payload)
     
     def get_player_knowledge_view(self, room_code: str, viewer_player_id: str) -> list[dict]:
         """

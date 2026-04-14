@@ -1,6 +1,10 @@
 """API routes for the Undercover game."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.auth.dependencies import get_current_user_optional
+from app.core.exceptions import StaleRoomVersionError
+from app.db.models.user import User
 
 from app.games.undercover.constants import CATEGORIES
 from app.games.undercover.schemas import (
@@ -23,6 +27,22 @@ router = APIRouter()
 service = UndercoverGameService()
 
 
+def _stale_room_http(room_code: str, exc: Exception) -> HTTPException:
+    state = None
+    try:
+        state = build_room_response(service.get_room_state(room_code)).model_dump()
+    except Exception:
+        state = None
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": "stale_room_version",
+            "message": str(exc),
+            "state": state,
+        },
+    )
+
+
 def build_room_response(room) -> RoomStateResponse:
     """Convert domain room to API response schema."""
     player_vote_counts = {player.id: 0 for player in room.players.values()}
@@ -33,6 +53,7 @@ def build_room_response(room) -> RoomStateResponse:
 
     return RoomStateResponse(
         room_code=room.room_code,
+        room_version=room.room_version,
         host_id=room.host_id,
         categories=room.categories,
         max_player_count=room.max_player_count,
@@ -66,7 +87,10 @@ def get_categories():
 
 
 @router.post("/rooms", response_model=RoomStateResponse)
-def create_room(payload: CreateRoomRequest):
+def create_room(
+    payload: CreateRoomRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+):
     """Create a new Undercover room."""
     try:
         room = service.create_room(
@@ -74,6 +98,7 @@ def create_room(payload: CreateRoomRequest):
             max_player_count=payload.max_player_count,
             undercover_count=payload.undercover_count,
             categories=payload.categories,
+            auth_username=current_user.username if current_user else None,
         )
         response = build_room_response(room)
         track_event_async(
@@ -87,16 +112,24 @@ def create_room(payload: CreateRoomRequest):
         )
         return response
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room.room_code if 'room' in locals() else "unknown", exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/rooms/{room_code}/join", response_model=RoomStateResponse)
-def join_room(room_code: str, payload: JoinRoomRequest):
+def join_room(
+    room_code: str,
+    payload: JoinRoomRequest,
+    current_user: User | None = Depends(get_current_user_optional),
+):
     """Join an existing room."""
     try:
-        room = service.join_room(room_code, payload.player_name)
+        room = service.join_room(room_code, payload.player_name, current_user.username if current_user else None)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -117,6 +150,8 @@ def start_room(room_code: str):
         )
         return response
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -136,6 +171,8 @@ def reveal_secret(room_code: str, payload: RevealWordRequest):
     try:
         return service.get_player_secret(room_code, payload.player_id)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -146,6 +183,8 @@ def vote(room_code: str, payload: VoteRequest):
         room = service.submit_vote(room_code, payload.voter_id, payload.voted_player_ids)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -156,6 +195,8 @@ def restart_room(room_code: str, payload: RestartRoomRequest):
         room = service.restart_game(room_code, payload.categories, payload.undercover_count)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     
 
@@ -168,6 +209,8 @@ def leave_room(room_code: str, payload: LeaveRoomRequest):
             return {"message": "Room became empty and was deleted."}
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -178,6 +221,8 @@ def remove_player(room_code: str, payload: RemovePlayerRequest):
         room = service.remove_player(room_code, payload.host_id, payload.player_id_to_remove)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -188,6 +233,8 @@ def update_categories(room_code: str, payload: UpdateCategoriesRequest):
         room = service.update_categories(room_code, payload.host_id, payload.categories)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

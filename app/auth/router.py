@@ -11,6 +11,7 @@ from starlette import status
 
 from app.auth.dependencies import get_current_user, get_current_user_optional
 from app.auth.schemas import (
+    GameHistorySessionResponse,
     GameInviteResponse,
     ProfileUpdateResponse,
     RegisterRequest,
@@ -302,6 +303,20 @@ def get_friend_requests(
     """
     requests = auth_service.get_pending_requests(db, current_user.id)
     return [UserResponse.model_validate(requester) for requester in requests]
+
+
+@router.get("/games/history", response_model=list[GameHistorySessionResponse])
+def get_game_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get game history for the current user."""
+    return auth_service.get_game_history(
+        db=db,
+        user_id=current_user.id,
+        username=current_user.username,
+        limit=100,
+    )
 
 
 @router.post("/friends/{requester_id}/accept")

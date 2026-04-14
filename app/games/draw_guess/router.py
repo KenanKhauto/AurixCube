@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth.dependencies import get_current_user_optional
+from app.core.exceptions import StaleRoomVersionError
 from app.db.models.user import User
 from app.games.draw_guess.constants import DRAW_CATEGORIES
 from app.games.draw_guess.schemas import (
@@ -35,6 +36,22 @@ from app.services.analytics import track_event_async
 router = APIRouter()
 service = DrawGuessGameService()
 logger = logging.getLogger(__name__)
+
+
+def _stale_room_http(room_code: str, exc: Exception) -> HTTPException:
+    state = None
+    try:
+        state = build_room_response(service.get_room_state(room_code)).model_dump()
+    except Exception:
+        state = None
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": "stale_room_version",
+            "message": str(exc),
+            "state": state,
+        },
+    )
 
 
 def build_room_response(room) -> DrawGuessRoomStateResponse:
@@ -138,6 +155,9 @@ def create_room(
         )
         return response
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            stale_room_code = room.room_code if "room" in locals() else "unknown"
+            raise _stale_room_http(stale_room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -161,6 +181,8 @@ async def join_room(
         )
         return response
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -170,6 +192,8 @@ def update_character(room_code: str, payload: DrawGuessUpdateCharacterRequest):
         room = service.update_character(room_code, payload.player_id, payload.character_id)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -190,6 +214,8 @@ def start_room(room_code: str):
         )
         return response
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -199,6 +225,8 @@ def get_room(room_code: str):
         room = service.get_room_state(room_code)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
@@ -208,6 +236,8 @@ def select_word(room_code: str, payload: DrawGuessSelectWordRequest):
         room = service.select_word(room_code, payload.player_id, payload.chosen_word_en)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -217,6 +247,8 @@ def advance_round(room_code: str, payload: DrawGuessAdvanceRoundRequest):
         room = service.advance_round(room_code, payload.player_id)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -232,6 +264,8 @@ def restart_room(room_code: str, payload: DrawGuessRestartGameRequest):
         )
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -243,6 +277,8 @@ def leave_room(room_code: str, payload: DrawGuessLeaveRoomRequest):
             return {"message": "Room became empty and was deleted."}
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -252,6 +288,8 @@ def remove_player(room_code: str, payload: DrawGuessRemovePlayerRequest):
         room = service.remove_player(room_code, payload.host_id, payload.player_id_to_remove)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -261,6 +299,8 @@ def update_categories(room_code: str, payload: DrawGuessUpdateCategoriesRequest)
         room = service.update_categories(room_code, payload.host_id, payload.categories)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -270,6 +310,8 @@ def delete_room(room_code: str, payload: DrawGuessDeleteRoomRequest):
         service.delete_room(room_code, payload.player_id)
         return {"message": "Room deleted successfully."}
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

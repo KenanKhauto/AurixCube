@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}سجل اللعب{% endblock %}
+
+{% block content %}
+<style>
+.history-summary-row {
+    cursor: pointer;
+}
+
+.history-summary-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.history-summary-row.history-expanded {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.history-details-row td {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.history-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.history-meta-item {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.history-meta-label {
+    display: block;
+    color: #bfbfbf;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+.history-meta-value {
+    display: block;
+    color: #fff;
+    font-weight: 700;
+}
+</style>
+
+<div class="card glow-border">
+    <h1 style="color:var(--primary); text-shadow: var(--glow);">سجل اللعب</h1>
+    <p style="color:#aaa;">جميع مبارياتك السابقة. اضغط على أي سطر لعرض التفاصيل أو إخفائها.</p>
+
+    <div class="profile-box profile-social-box" style="margin-top: 20px;">
+        <div class="profile-social-header">
+            <div>
+                <h3 class="profile-section-title">المباريات</h3>
+                <p class="profile-section-subtitle">يتم عرض 10 مباريات في كل صفحة.</p>
+            </div>
+            <div class="profile-pager" id="historyPager"></div>
+        </div>
+        <div id="game-history-list"></div>
+    </div>
+</div>
+
+<script>
+const HISTORY_PAGE_SIZE = 10;
+let allHistory = [];
+let currentHistoryPage = 0;
+const expandedHistoryRows = new Set();
+
+function escapeHistoryHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function getHistoryGameLabel(gameType) {
+    const labels = {
+        bluff: "لعبة الخداع",
+        who_am_i: "من أنا",
+        undercover: "أندر كوفر",
+        draw_guess: "ارسم وخمّن",
+    };
+    return labels[gameType] || gameType || "لعبة";
+}
+
+function toLatinDigits(value) {
+    return String(value ?? "")
+        .replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
+        .replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d));
+}
+
+function formatLatinNumber(value) {
+    if (value === null || value === undefined || value === "") return "-";
+    const num = Number(value);
+    if (!Number.isFinite(num)) return toLatinDigits(value);
+    return new Intl.NumberFormat("en-US").format(num);
+}
+
+function formatHistoryDate(isoText) {
+    if (!isoText) return "-";
+    const parsed = new Date(isoText);
+    if (Number.isNaN(parsed.getTime())) return "-";
+    return parsed.toLocaleString("en-GB", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    });
+}
+
+function getHistoryResultLabel(item) {
+    if (item?.me?.is_winner) return "فوز";
+    const reasonLabels = {
+        game_completed: "مكتملة",
+        host_deleted: "حذف المنظّم الغرفة",
+        insufficient_players: "عدد لاعبين غير كافٍ",
+        timeout: "انتهى الوقت",
+        player_left: "غادر لاعب",
+        room_deleted: "تم حذف الغرفة",
+        abandoned: "تم التخلي عن المباراة",
+    };
+    const key = String(item?.end_reason || "").trim();
+    if (!key) return "انتهت";
+    return reasonLabels[key] || key;
+}
+
+function getHistoryMyStatsLabel(item) {
+    const parts = [];
+    if (typeof item?.me?.score === "number") parts.push(`النقاط: ${formatLatinNumber(item.me.score)}`);
+    if (typeof item?.me?.guess_count === "number") parts.push(`التخمينات: ${formatLatinNumber(item.me.guess_count)}`);
+    if (typeof item?.me?.solved_order === "number") parts.push(`الترتيب: ${formatLatinNumber(item.me.solved_order)}`);
+    return parts.length ? parts.join(" | ") : "-";
+}
+
+function buildParticipantsTable(item) {
+    const participants = item?.participants || [];
+    if (!participants.length) {
+        return `<div class="profile-empty-state">لا توجد تفاصيل لاعبين.</div>`;
+    }
+
+    const rows = participants.map((p) => {
+        const tags = [];
+        if (p.is_host) tags.push("منظّم");
+        if (p.is_winner) tags.push("فائز");
+        const role = tags.length ? tags.join(" - ") : "-";
+        const playerName = p.player_name || "لاعب";
+        const username = p.username ? `@${p.username}` : "-";
+        const score = typeof p.score === "number" ? formatLatinNumber(p.score) : "-";
+        const guessCount = typeof p.guess_count === "number" ? formatLatinNumber(p.guess_count) : "-";
+        const solvedOrder = typeof p.solved_order === "number" ? formatLatinNumber(p.solved_order) : "-";
+
+        return `
+            <tr>
+                <td>${escapeHistoryHtml(playerName)}</td>
+                <td>${escapeHistoryHtml(username)}</td>
+                <td>${escapeHistoryHtml(role)}</td>
+                <td>${escapeHistoryHtml(score)}</td>
+                <td>${escapeHistoryHtml(guessCount)}</td>
+                <td>${escapeHistoryHtml(solvedOrder)}</td>
+            </tr>
+        `;
+    }).join("");
+
+    return `
+        <div class="table-wrapper profile-friends-table-wrapper" style="margin-top: 10px;">
+            <table class="bluff-table profile-friends-table">
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>المستخدم</th>
+                        <th>الدور</th>
+                        <th>النقاط</th>
+                        <th>التخمينات</th>
+                        <th>الترتيب</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderHistory() {
+    const container = document.getElementById("game-history-list");
+    const pager = document.getElementById("historyPager");
+    if (!container || !pager) return;
+
+    if (!allHistory.length) {
+        container.innerHTML = `<div class="profile-empty-state">لا يوجد سجل لعب حتى الآن.</div>`;
+        pager.innerHTML = "";
+        return;
+    }
+
+    const totalPages = Math.ceil(allHistory.length / HISTORY_PAGE_SIZE);
+    const safePage = Math.max(0, Math.min(currentHistoryPage, totalPages - 1));
+    const start = safePage * HISTORY_PAGE_SIZE;
+    const pageItems = allHistory.slice(start, start + HISTORY_PAGE_SIZE);
+
+    const rows = pageItems.map((item, index) => {
+        const absoluteIndex = start + index;
+        const sessionId = item.session_id || `${item.game_type}-${item.ended_at}`;
+        const expanded = expandedHistoryRows.has(sessionId);
+
+        return `
+            <tr class="history-summary-row ${expanded ? "history-expanded" : ""}" onclick="toggleHistoryRowByIndex(${absoluteIndex})">
+                <td>${escapeHistoryHtml(getHistoryGameLabel(item.game_type))}</td>
+                <td>${escapeHistoryHtml(formatHistoryDate(item.ended_at))}</td>
+                <td>${escapeHistoryHtml(getHistoryResultLabel(item))}</td>
+                <td>${escapeHistoryHtml(getHistoryMyStatsLabel(item))}</td>
+            </tr>
+            <tr class="history-details-row ${expanded ? "" : "hidden"}">
+                <td colspan="4">
+                    <div class="history-meta-grid">
+                        <div class="history-meta-item">
+                            <span class="history-meta-label">رمز الغرفة</span>
+                            <span class="history-meta-value">${escapeHistoryHtml(item.room_code || "-")}</span>
+                        </div>
+                        <div class="history-meta-item">
+                            <span class="history-meta-label">عدد اللاعبين</span>
+                            <span class="history-meta-value">${escapeHistoryHtml(formatLatinNumber(item.player_count))}</span>
+                        </div>
+                        <div class="history-meta-item">
+                            <span class="history-meta-label">المنظّم</span>
+                            <span class="history-meta-value">${escapeHistoryHtml(item.host_player_name || "-")}</span>
+                        </div>
+                        <div class="history-meta-item">
+                            <span class="history-meta-label">سبب النهاية</span>
+                            <span class="history-meta-value">${escapeHistoryHtml(getHistoryResultLabel(item))}</span>
+                        </div>
+                    </div>
+                    ${buildParticipantsTable(item)}
+                </td>
+            </tr>
+        `;
+    }).join("");
+
+    container.innerHTML = `
+        <div class="table-wrapper profile-friends-table-wrapper">
+            <table class="bluff-table profile-friends-table">
+                <thead>
+                    <tr>
+                        <th>اللعبة</th>
+                        <th>التاريخ</th>
+                        <th>النتيجة</th>
+                        <th>إحصائياتي</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+
+    const prevDisabled = safePage === 0 ? "disabled" : "";
+    const nextDisabled = safePage >= totalPages - 1 ? "disabled" : "";
+    pager.innerHTML = `
+        <button type="button" class="profile-page-arrow" onclick="changeHistoryPage(-1)" ${prevDisabled}>
+            <i class="fa-solid fa-chevron-right"></i>
+        </button>
+        <span class="profile-page-indicator">${safePage + 1} / ${totalPages}</span>
+        <button type="button" class="profile-page-arrow" onclick="changeHistoryPage(1)" ${nextDisabled}>
+            <i class="fa-solid fa-chevron-left"></i>
+        </button>
+    `;
+}
+
+function toggleHistoryRowByIndex(index) {
+    const item = allHistory[index];
+    if (!item) return;
+    const sessionId = item.session_id || `${item.game_type}-${item.ended_at}`;
+    if (!sessionId) return;
+    if (expandedHistoryRows.has(sessionId)) {
+        expandedHistoryRows.delete(sessionId);
+    } else {
+        expandedHistoryRows.add(sessionId);
+    }
+    renderHistory();
+}
+
+function changeHistoryPage(step) {
+    const totalPages = Math.max(1, Math.ceil(allHistory.length / HISTORY_PAGE_SIZE));
+    currentHistoryPage = Math.max(0, Math.min(currentHistoryPage + step, totalPages - 1));
+    renderHistory();
+}
+
+async function loadGameHistory() {
+    try {
+        const response = await fetch("/games/history");
+        if (!response.ok) {
+            document.getElementById("game-history-list").innerHTML = `<div class="profile-empty-state">تعذر تحميل سجل اللعب.</div>`;
+            return;
+        }
+
+        allHistory = await response.json();
+        const maxPage = Math.max(0, Math.ceil(allHistory.length / HISTORY_PAGE_SIZE) - 1);
+        currentHistoryPage = Math.min(currentHistoryPage, maxPage);
+        renderHistory();
+    } catch (error) {
+        console.error("Error loading game history:", error);
+        document.getElementById("game-history-list").innerHTML = `<div class="profile-empty-state">تعذر تحميل سجل اللعب.</div>`;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadGameHistory();
+});
+</script>
+{% endblock %}

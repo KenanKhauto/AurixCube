@@ -29,6 +29,7 @@ let drawStrokeHistory = [];
 let lastDrawCanvasSessionKey = null;
 let latestDrawRoomVersion = 0;
 let drawActionCounter = 0;
+let drawStaleResyncCount = 0;
 const pendingDrawActions = new Map();
 
 const MAX_DRAW_CATEGORIES = 12;
@@ -846,6 +847,31 @@ function applyDrawStateSync(state) {
     renderDrawState(state);
 }
 
+function getDrawErrorMessage(data, fallbackMessage) {
+    const detail = data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (detail && typeof detail === "object" && typeof detail.message === "string" && detail.message.trim()) {
+        return detail.message;
+    }
+    return fallbackMessage;
+}
+
+function tryDrawStaleResync(response, data) {
+    if (response?.status !== 409) return false;
+    const staleState = data?.detail?.state;
+    if (!staleState || typeof staleState !== "object") return false;
+    drawStaleResyncCount += 1;
+    console.debug("[draw-guess] stale resync", {
+        count: drawStaleResyncCount,
+        roomCode: currentDrawRoomCode,
+        localVersion: latestDrawRoomVersion,
+        serverVersion: Number(staleState.room_version || 0),
+    });
+    applyDrawStateSync(staleState);
+    hideDrawError();
+    return true;
+}
+
 async function loadDrawCategories() {
     const response = await fetch("/api/draw-guess/categories");
     const data = await response.json();
@@ -1163,7 +1189,8 @@ async function createDrawRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showDrawError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        if (tryDrawStaleResync(response, data)) return;
+        showDrawError(getDrawErrorMessage(data, "حدث خطأ أثناء إنشاء الغرفة."));
         return;
     }
 
@@ -1205,7 +1232,8 @@ async function joinDrawRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showDrawError(data.detail || "تعذر الانضمام إلى الغرفة.");
+        if (tryDrawStaleResync(response, data)) return;
+        showDrawError(getDrawErrorMessage(data, "تعذر الانضمام إلى الغرفة."));
         return;
     }
 
@@ -1305,7 +1333,8 @@ async function restartDrawGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        showDrawError(data.detail || "تعذر إعادة اللعبة.");
+        if (tryDrawStaleResync(response, data)) return;
+        showDrawError(getDrawErrorMessage(data, "تعذر إعادة اللعبة."));
         return;
     }
 
@@ -1328,7 +1357,8 @@ async function leaveDrawRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showDrawError(data.detail || "تعذر الخروج من الغرفة.");
+        if (tryDrawStaleResync(response, data)) return;
+        showDrawError(getDrawErrorMessage(data, "تعذر الخروج من الغرفة."));
         return;
     }
 
@@ -1354,7 +1384,8 @@ async function deleteDrawRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showDrawError(data.detail || "تعذر حذف الغرفة.");
+        if (tryDrawStaleResync(response, data)) return;
+        showDrawError(getDrawErrorMessage(data, "تعذر حذف الغرفة."));
         return;
     }
 
@@ -1383,7 +1414,8 @@ async function removeDrawPlayer(playerIdToRemove) {
     const data = await response.json();
 
     if (!response.ok) {
-        showDrawError(data.detail || "تعذر حذف اللاعب.");
+        if (tryDrawStaleResync(response, data)) return;
+        showDrawError(getDrawErrorMessage(data, "تعذر حذف اللاعب."));
         return;
     }
 
@@ -2039,3 +2071,7 @@ async function maybeAutoJoinDrawInvite() {
 document.addEventListener("DOMContentLoaded", () => {
     maybeAutoJoinDrawInvite();
 });
+
+
+
+

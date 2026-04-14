@@ -7,11 +7,12 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from app.core.exceptions import InvalidVoteError, PlayerNotFoundError, RoomNotFoundError
+from app.core.exceptions import InvalidVoteError, PlayerNotFoundError, RoomNotFoundError, StaleRoomVersionError
 from app.core.utils import choose_random_players, generate_room_code
 from app.games.undercover.constants import CATEGORIES
 from app.games.undercover.domain import Player, UndercoverRoom
 from app.repositories.room_repository import RoomRepository
+from app.services.game_history_service import record_completed_room
 from app.services.room_storage import get_room_repository
 
 
@@ -36,6 +37,7 @@ class UndercoverGameService:
         max_player_count: int,
         undercover_count: int,
         categories: list[str],
+        auth_username: str | None = None,
     ) -> UndercoverRoom:
         """
         Create a new room and add the host as the first player.
@@ -51,13 +53,14 @@ class UndercoverGameService:
             categories=categories,
             max_player_count=max_player_count,
             undercover_count=undercover_count,
+            session_id=str(uuid.uuid4()),
         )
-        room.players[host_id] = Player(id=host_id, name=host_name)
+        room.players[host_id] = Player(id=host_id, name=host_name, username=auth_username)
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room_code, room)
         return room
 
-    def join_room(self, room_code: str, player_name: str) -> UndercoverRoom:
+    def join_room(self, room_code: str, player_name: str, auth_username: str | None = None) -> UndercoverRoom:
         """
         Join an existing room. Allow joining even during active gameplay.
         """
@@ -71,13 +74,13 @@ class UndercoverGameService:
 
         # Allow joining mid-game
         player_id = str(uuid.uuid4())
-        room.players[player_id] = Player(id=player_id, name=player_name)
+        room.players[player_id] = Player(id=player_id, name=player_name, username=auth_username)
 
         # If game is already started, add player to votes pool
         if room.started:
             room.votes[player_id] = []
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room_code, room)
         return room
 
     def leave_room(self, room_code: str, player_id: str) -> Optional[UndercoverRoom]:
@@ -102,7 +105,7 @@ class UndercoverGameService:
             return None
 
         self._finalize_room_after_player_removal(room)
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room_code, room)
         return room
 
     def update_categories(self, room_code: str, host_id: str, categories: list[str]) -> UndercoverRoom:
@@ -115,7 +118,7 @@ class UndercoverGameService:
             raise ValueError("Categories can only be updated before the game starts.")
 
         room.categories = self._validate_categories(categories, allow_empty=True)
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room_code, room)
         return room
 
     def remove_player(self, room_code: str, host_id: str, player_id_to_remove: str) -> UndercoverRoom:
@@ -137,14 +140,14 @@ class UndercoverGameService:
             return room
 
         self._finalize_room_after_player_removal(room)
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room_code, room)
         return room
 
     def heartbeat(self, room_code: str, player_id: str) -> None:
         room = self._get_room(room_code)
         if player_id in room.players:
             room.players[player_id].last_seen = datetime.now()
-            self.room_repository.save_room(room_code, self._serialize_room(room))
+            self._save_room(room_code, room, bump_version=False)
 
     def delete_room(self, room_code: str, player_id: str) -> None:
         """
@@ -157,7 +160,7 @@ class UndercoverGameService:
 
         room.ended = True
         room.end_reason = "host_deleted"
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room_code, room)
         self.room_repository.delete_room(room_code)
 
     def _cleanup_inactive_players(self, room: UndercoverRoom) -> None:
@@ -217,7 +220,7 @@ class UndercoverGameService:
         room.round_number = 1
         self._assign_round_pair(room)
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room_code, room)
         return room
 
     def get_room_state(self, room_code: str) -> UndercoverRoom:
@@ -282,7 +285,7 @@ class UndercoverGameService:
         room.votes[voter_id] = voted_player_ids
         self._resolve_votes(room)
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room_code, room)
         return room
 
     def restart_game(self, room_code: str, categories: list[str], undercover_count: int) -> UndercoverRoom:
@@ -306,6 +309,7 @@ class UndercoverGameService:
         room.started = False
         room.ended = False
         room.end_reason = None
+        room.session_id = str(uuid.uuid4())
         room.winner = None
         room.votes = {}
         room.eliminated_player_id = None
@@ -315,7 +319,7 @@ class UndercoverGameService:
         room.current_target_id = None
         room.round_number = 1
 
-        self.room_repository.save_room(room_code, self._serialize_room(room))
+        self._save_room(room_code, room)
         return room
 
     def _validate_categories(self, categories: list[str], allow_empty: bool = False) -> list[str]:
@@ -547,10 +551,27 @@ class UndercoverGameService:
             raise RoomNotFoundError("Room not found.")
         return self._deserialize_room(raw_room)
 
+    def _save_room(self, room_code: str, room: UndercoverRoom, bump_version: bool = True) -> None:
+        previous_version = int(room.room_version)
+        if bump_version:
+            room.room_version += 1
+        payload = self._serialize_room(room)
+        saved = self.room_repository.save_room(
+            room_code,
+            payload,
+            expected_room_version=previous_version,
+        )
+        if not saved:
+            raise StaleRoomVersionError("Room state changed. Please resync.")
+        if room.ended:
+            record_completed_room("undercover", payload)
+
     def _serialize_room(self, room: UndercoverRoom) -> dict:
         """Convert room object into serializable dictionary."""
         return {
             "room_code": room.room_code,
+            "session_id": room.session_id,
+            "room_version": room.room_version,
             "host_id": room.host_id,
             "categories": room.categories,
             "max_player_count": room.max_player_count,
@@ -570,6 +591,7 @@ class UndercoverGameService:
                 player_id: {
                     "id": player.id,
                     "name": player.name,
+                    "username": player.username,
                     "secret_word": player.secret_word,
                     "is_undercover": player.is_undercover,
                     "is_eliminated": player.is_eliminated,
@@ -589,6 +611,8 @@ class UndercoverGameService:
             categories=data.get("categories", [data["category"]] if "category" in data else []),
             max_player_count=data["max_player_count"],
             undercover_count=data["undercover_count"],
+            session_id=data.get("session_id") or f"undercover:{data['room_code']}:{data['host_id']}",
+            room_version=data.get("room_version", 0),
             started=data["started"],
             ended=data["ended"],
             end_reason=data.get("end_reason"),
@@ -606,9 +630,11 @@ class UndercoverGameService:
             room.players[player_id] = Player(
                 id=player_data["id"],
                 name=player_data["name"],
+                username=player_data.get("username"),
                 secret_word=player_data["secret_word"],
                 is_undercover=player_data["is_undercover"],
                 is_eliminated=player_data["is_eliminated"],
             )
 
         return room
+

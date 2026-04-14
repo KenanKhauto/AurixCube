@@ -95,6 +95,22 @@ def profile_page(
         },
     )
 
+
+@router.get("/profile/game-history")
+def game_history_page(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Render the dedicated game history page for the authenticated user."""
+    return templates.TemplateResponse(
+        request,
+        "game_history.html",
+        {
+            "request": request,
+            "current_user": current_user,
+        },
+    )
+
 @router.get("/games/undercover")
 def undercover_page(
     request: Request,
