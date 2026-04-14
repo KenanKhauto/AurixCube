@@ -1,89 +1,671 @@
 {% extends "base.html" %}
 
-{% block title %}Live Monitor{% endblock %}
+{% block title %}Ù„ÙˆØ­Ø© ØªØ­ÙƒÙ… Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©{% endblock %}
 
 {% block content %}
-<div class="card glow-border" style="max-width: 1100px; margin: 20px auto;">
-    <h2 style="color:var(--primary); margin-bottom:12px;">Live Room Monitor</h2>
-    <p style="color:#aaa; margin-bottom:18px;">Admin-only operational view for active rooms.</p>
+<div class="card glow-border" style="max-width: 1300px; margin: 20px auto;">
+    <h2 style="color:var(--primary); margin-bottom:8px;">Ù„ÙˆØ­Ø© ØªØ­ÙƒÙ… Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©</h2>
+    <p style="color:#aaa; margin-bottom:16px;">
+        Ù…ØªØ§Ø¨Ø¹Ø© Ø§Ù„ØºØ±Ù Ø§Ù„Ù…Ø¨Ø§Ø´Ø±Ø©ØŒ Ø§Ø³ØªØ¹Ø±Ø§Ø¶ ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¬Ù„Ø³Ø§ØªØŒ ÙˆØ¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ†.
+    </p>
 
-    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
         <div class="card" style="min-width:220px; padding:12px;">
-            <div style="color:#888;">Total Active Rooms</div>
+            <div style="color:#888;">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„ØºØ±Ù Ø§Ù„Ù…Ø¹Ø±ÙˆØ¶Ø©</div>
             <div id="adminTotalRooms" style="font-size:24px; font-weight:700;">0</div>
         </div>
         <div class="card" style="min-width:220px; padding:12px;">
-            <div style="color:#888;">Connected Users (WS)</div>
+            <div style="color:#888;">Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ† Ø§Ù„Ù…ØªØµÙ„ÙˆÙ† (WS)</div>
             <div id="adminConnectedUsers" style="font-size:24px; font-weight:700;">0</div>
+        </div>
+        <div class="card" style="min-width:220px; padding:12px;">
+            <div style="color:#888;">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† (Ù†ØªØ§Ø¦Ø¬ Ø§Ù„ÙÙ„ØªØ±)</div>
+            <div id="adminUsersTotal" style="font-size:24px; font-weight:700;">0</div>
         </div>
     </div>
 
-    <div class="table-wrapper">
-        <table class="bluff-table">
-            <thead>
-                <tr>
-                    <th>Room Code</th>
-                    <th>Game</th>
-                    <th>Status</th>
-                    <th>Users</th>
-                    <th>Players</th>
-                    <th>Created</th>
-                    <th>Last Activity</th>
-                </tr>
-            </thead>
-            <tbody id="adminLiveRoomsBody"></tbody>
-        </table>
+    <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+        <button class="btn btn-primary admin-tab-btn" data-tab="live" onclick="switchAdminTab('live')">Ø§Ù„ØºØ±Ù Ø§Ù„Ù…Ø¨Ø§Ø´Ø±Ø©</button>
+        <button class="btn admin-tab-btn" data-tab="history" onclick="switchAdminTab('history')">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¬Ù„Ø³Ø§Øª</button>
+        <button class="btn admin-tab-btn" data-tab="users" onclick="switchAdminTab('users')">Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†</button>
+    </div>
+
+    <section id="adminTabLive">
+        <div class="card" style="padding:12px; margin-bottom:10px;">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px;">
+                <div>
+                    <label>Ù†ÙˆØ¹ Ø§Ù„Ù„Ø¹Ø¨Ø©</label>
+                    <select id="liveGameType">
+                        <option value="">Ø§Ù„ÙƒÙ„</option>
+                        <option value="bluff">Ø§Ù„Ø®Ø¯Ø§Ø¹</option>
+                        <option value="who_am_i">Ù…Ù† Ø£Ù†Ø§</option>
+                        <option value="draw_guess">Ø§Ø±Ø³Ù… ÙˆØ®Ù…Ù‘Ù†</option>
+                        <option value="undercover">Ø£Ù†Ø¯Ø± ÙƒÙˆÙØ±</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Ø­Ø§Ù„Ø© Ø§Ù„Ù„Ø¹Ø¨Ø©</label>
+                    <select id="liveStatus">
+                        <option value="">Ø§Ù„ÙƒÙ„</option>
+                        <option value="waiting">Ø§Ù†ØªØ¸Ø§Ø±</option>
+                        <option value="category_pick">Ø§Ø®ØªÙŠØ§Ø± ØªØµÙ†ÙŠÙ</option>
+                        <option value="submission">Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø¥Ø¬Ø§Ø¨Ø§Øª</option>
+                        <option value="answer_pick">Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø¥Ø¬Ø§Ø¨Ø©</option>
+                        <option value="round_result">Ù†ØªÙŠØ¬Ø© Ø§Ù„Ø¬ÙˆÙ„Ø©</option>
+                        <option value="game_over">Ù…Ù†ØªÙ‡ÙŠØ©</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Ø£Ù‚Ù„ Ø¹Ø¯Ø¯ Ù„Ø§Ø¹Ø¨ÙŠÙ†</label>
+                    <input id="liveMinPlayers" type="number" min="0" placeholder="0">
+                </div>
+                <div>
+                    <label>Ø£Ø¹Ù„Ù‰ Ø¹Ø¯Ø¯ Ù„Ø§Ø¹Ø¨ÙŠÙ†</label>
+                    <input id="liveMaxPlayers" type="number" min="0" placeholder="10">
+                </div>
+                <div>
+                    <label>Ø¨Ø­Ø«</label>
+                    <input id="liveSearch" type="text" placeholder="Ø±Ù…Ø² ØºØ±ÙØ© Ø£Ùˆ Ø§Ø³Ù… Ù„Ø§Ø¹Ø¨">
+                </div>
+                <div>
+                    <label>ØªØ±ØªÙŠØ¨ Ø­Ø³Ø¨</label>
+                    <select id="liveSortBy">
+                        <option value="last_activity_at">Ø¢Ø®Ø± Ù†Ø´Ø§Ø·</option>
+                        <option value="created_at">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ù†Ø´Ø§Ø¡</option>
+                        <option value="user_count">Ø¹Ø¯Ø¯ Ø§Ù„Ù„Ø§Ø¹Ø¨ÙŠÙ†</option>
+                        <option value="game_type">Ù†ÙˆØ¹ Ø§Ù„Ù„Ø¹Ø¨Ø©</option>
+                        <option value="status">Ø§Ù„Ù…Ø±Ø­Ù„Ø©</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Ø§ØªØ¬Ø§Ù‡ Ø§Ù„ØªØ±ØªÙŠØ¨</label>
+                    <select id="liveSortOrder">
+                        <option value="desc">ØªÙ†Ø§Ø²Ù„ÙŠ</option>
+                        <option value="asc">ØªØµØ§Ø¹Ø¯ÙŠ</option>
+                    </select>
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                    <button class="btn btn-primary" onclick="refreshLiveRooms()">ØªØ­Ø¯ÙŠØ«</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="bluff-table">
+                <thead>
+                    <tr>
+                        <th>Ø±Ù…Ø² Ø§Ù„ØºØ±ÙØ©</th>
+                        <th>Ø§Ù„Ù„Ø¹Ø¨Ø©</th>
+                        <th>Ø§Ù„Ù…Ø±Ø­Ù„Ø©</th>
+                        <th>Ø§Ù„Ù„Ø§Ø¹Ø¨ÙˆÙ†</th>
+                        <th>Ø£Ø³Ù…Ø§Ø¡ Ø§Ù„Ù„Ø§Ø¹Ø¨ÙŠÙ†</th>
+                        <th>Ø§Ù„Ø¥Ù†Ø´Ø§Ø¡</th>
+                        <th>Ø¢Ø®Ø± Ù†Ø´Ø§Ø·</th>
+                        <th>Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                    </tr>
+                </thead>
+                <tbody id="adminLiveRoomsBody"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="adminTabHistory" class="hidden">
+        <div class="card" style="padding:12px; margin-bottom:10px;">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px;">
+                <div>
+                    <label>Ù†ÙˆØ¹ Ø§Ù„Ù„Ø¹Ø¨Ø©</label>
+                    <select id="historyGameType">
+                        <option value="">Ø§Ù„ÙƒÙ„</option>
+                        <option value="bluff">Ø§Ù„Ø®Ø¯Ø§Ø¹</option>
+                        <option value="who_am_i">Ù…Ù† Ø£Ù†Ø§</option>
+                        <option value="draw_guess">Ø§Ø±Ø³Ù… ÙˆØ®Ù…Ù‘Ù†</option>
+                        <option value="undercover">Ø£Ù†Ø¯Ø± ÙƒÙˆÙØ±</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Ø³Ø¨Ø¨ Ø§Ù„Ù†Ù‡Ø§ÙŠØ©</label>
+                    <input id="historyEndReason" type="text" placeholder="Ù…Ø«Ø§Ù„: game_completed">
+                </div>
+                <div>
+                    <label>Ù…Ù† ÙˆÙ‚Øª</label>
+                    <input id="historyStartAt" type="datetime-local">
+                </div>
+                <div>
+                    <label>Ø¥Ù„Ù‰ ÙˆÙ‚Øª</label>
+                    <input id="historyEndAt" type="datetime-local">
+                </div>
+                <div>
+                    <label>Ø£Ù‚Ù„ Ù„Ø§Ø¹Ø¨ÙŠÙ†</label>
+                    <input id="historyMinPlayers" type="number" min="0">
+                </div>
+                <div>
+                    <label>Ø£Ø¹Ù„Ù‰ Ù„Ø§Ø¹Ø¨ÙŠÙ†</label>
+                    <input id="historyMaxPlayers" type="number" min="0">
+                </div>
+                <div>
+                    <label>ØªØ±ØªÙŠØ¨ Ø­Ø³Ø¨</label>
+                    <select id="historySortBy">
+                        <option value="ended_at">ÙˆÙ‚Øª Ø§Ù„Ù†Ù‡Ø§ÙŠØ©</option>
+                        <option value="player_count">Ø¹Ø¯Ø¯ Ø§Ù„Ù„Ø§Ø¹Ø¨ÙŠÙ†</option>
+                        <option value="game_type">Ù†ÙˆØ¹ Ø§Ù„Ù„Ø¹Ø¨Ø©</option>
+                        <option value="end_reason">Ø³Ø¨Ø¨ Ø§Ù„Ù†Ù‡Ø§ÙŠØ©</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Ø§ØªØ¬Ø§Ù‡</label>
+                    <select id="historySortOrder">
+                        <option value="desc">ØªÙ†Ø§Ø²Ù„ÙŠ</option>
+                        <option value="asc">ØªØµØ§Ø¹Ø¯ÙŠ</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Ø­Ø¯ Ø§Ù„Ù†ØªØ§Ø¦Ø¬</label>
+                    <input id="historyLimit" type="number" min="1" max="500" value="100">
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                    <button class="btn btn-primary" onclick="refreshHistory()">ØªØ­Ø¯ÙŠØ«</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="bluff-table">
+                <thead>
+                    <tr>
+                        <th>Session</th>
+                        <th>Ø§Ù„Ù„Ø¹Ø¨Ø©</th>
+                        <th>Ø±Ù…Ø² Ø§Ù„ØºØ±ÙØ©</th>
+                        <th>Ø§Ù„Ù…Ù†Ø¸Ù‘Ù…</th>
+                        <th>Ø§Ù„Ù„Ø§Ø¹Ø¨ÙˆÙ†</th>
+                        <th>Ø³Ø¨Ø¨ Ø§Ù„Ù†Ù‡Ø§ÙŠØ©</th>
+                        <th>ÙˆÙ‚Øª Ø§Ù„Ù†Ù‡Ø§ÙŠØ©</th>
+                    </tr>
+                </thead>
+                <tbody id="adminHistoryBody"></tbody>
+            </table>
+        </div>
+        <div id="adminHistoryPager" style="display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:10px;"></div>
+    </section>
+
+    <section id="adminTabUsers" class="hidden">
+        <div class="card" style="padding:12px; margin-bottom:10px;">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px;">
+                <div>
+                    <label>Ø¨Ø­Ø«</label>
+                    <input id="usersSearch" type="text" placeholder="username / display / email">
+                </div>
+                <div>
+                    <label>ØªØ±ØªÙŠØ¨ Ø­Ø³Ø¨</label>
+                    <select id="usersSortBy">
+                        <option value="created_at">ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ù†Ø´Ø§Ø¡</option>
+                        <option value="username">Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…</option>
+                        <option value="email">Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Ø§ØªØ¬Ø§Ù‡</label>
+                    <select id="usersSortOrder">
+                        <option value="desc">ØªÙ†Ø§Ø²Ù„ÙŠ</option>
+                        <option value="asc">ØªØµØ§Ø¹Ø¯ÙŠ</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Ø­Ø¯ Ø§Ù„Ù†ØªØ§Ø¦Ø¬</label>
+                    <input id="usersLimit" type="number" min="1" max="500" value="100">
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                    <button class="btn btn-primary" onclick="refreshUsers()">ØªØ­Ø¯ÙŠØ«</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="bluff-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…</th>
+                        <th>Ø§Ù„Ø§Ø³Ù… Ø§Ù„Ø¸Ø§Ù‡Ø±</th>
+                        <th>Ø§Ù„Ø¨Ø±ÙŠØ¯</th>
+                        <th>Ø§Ù„Ø¬Ù„Ø³Ø§Øª</th>
+                        <th>Ù…Ø±Ø§Øª Ø§Ù„ÙÙˆØ²</th>
+                        <th>Ø£Ø¯Ù…Ù†</th>
+                        <th>ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¥Ù†Ø´Ø§Ø¡</th>
+                        <th>Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
+                    </tr>
+                </thead>
+                <tbody id="adminUsersBody"></tbody>
+            </table>
+        </div>
+        <div id="adminUsersPager" style="display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:10px;"></div>
+    </section>
+</div>
+
+<div id="adminUserEditModal" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1200; align-items:center; justify-content:center; padding:16px;">
+    <div class="card glow-border" style="max-width:560px; width:100%;">
+        <h3 style="margin:0 0 12px; color:var(--primary);">ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…</h3>
+        <div style="display:grid; grid-template-columns:1fr; gap:10px;">
+            <div>
+                <label for="adminEditUsername">Ø§Ø³Ù… Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…</label>
+                <input id="adminEditUsername" type="text" autocomplete="off">
+            </div>
+            <div>
+                <label for="adminEditDisplayName">Ø§Ù„Ø§Ø³Ù… Ø§Ù„Ø¸Ø§Ù‡Ø±</label>
+                <input id="adminEditDisplayName" type="text" autocomplete="off">
+            </div>
+            <div>
+                <label for="adminEditEmail">Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ</label>
+                <input id="adminEditEmail" type="email" autocomplete="off">
+            </div>
+            <div>
+                <label for="adminEditPassword">ÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø¬Ø¯ÙŠØ¯Ø© (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)</label>
+                <input id="adminEditPassword" type="password" autocomplete="new-password">
+            </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
+            <button class="btn" type="button" onclick="closeUserEditModal()">Ø¥Ù„ØºØ§Ø¡</button>
+            <button class="btn btn-primary" type="button" onclick="submitUserEdit()">Ø­ÙØ¸</button>
+        </div>
     </div>
 </div>
 
 <script>
+let currentAdminTab = "live";
+let historyPage = 1;
+let usersPage = 1;
+let editingUserId = null;
+const historyDefaultLimit = 25;
+const usersDefaultLimit = 25;
+
+function toEnglishNumber(value) {
+    if (value === null || value === undefined || value === "") return "-";
+    const num = Number(value);
+    if (!Number.isFinite(num)) return String(value);
+    return new Intl.NumberFormat("en-US").format(num);
+}
+
 function formatAdminDate(value) {
     if (!value) return "-";
     const dt = new Date(value);
     if (Number.isNaN(dt.getTime())) return String(value);
-    return dt.toLocaleString();
+    return dt.toLocaleString("en-GB", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    });
 }
 
-function renderAdminRooms(data) {
-    document.getElementById("adminTotalRooms").textContent = data.total_active_rooms ?? 0;
-    document.getElementById("adminConnectedUsers").textContent = data.total_connected_users ?? 0;
+function getValue(id) {
+    return document.getElementById(id)?.value ?? "";
+}
+
+function mapGameType(value) {
+    const mapping = {
+        bluff: "لعبة الخداع",
+        who_am_i: "من أنا",
+        draw_guess: "ارسم وخمّن",
+        undercover: "أندر كوفر",
+    };
+    return mapping[value] || value || "-";
+}
+
+function mapPhase(value) {
+    const mapping = {
+        waiting: "انتظار",
+        category_pick: "اختيار التصنيف",
+        submission: "إرسال الإجابات",
+        answer_pick: "اختيار الإجابة",
+        round_result: "نتيجة الجولة",
+        game_over: "منتهية",
+    };
+    return mapping[value] || value || "-";
+}
+
+function mapEndReason(value) {
+    const mapping = {
+        game_completed: "اكتملت اللعبة",
+        host_deleted_room: "حذف المنظّم الغرفة",
+        host_left_room: "غادر المنظّم الغرفة",
+        room_expired: "انتهت صلاحية الغرفة",
+        no_players_remaining: "لا يوجد لاعبين متبقين",
+        admin_deleted_room: "تم حذف الغرفة بواسطة الإدارة",
+    };
+    return mapping[value] || value || "-";
+}
+
+function switchAdminTab(tabName) {
+    currentAdminTab = tabName;
+    document.getElementById("adminTabLive").classList.toggle("hidden", tabName !== "live");
+    document.getElementById("adminTabHistory").classList.toggle("hidden", tabName !== "history");
+    document.getElementById("adminTabUsers").classList.toggle("hidden", tabName !== "users");
+
+    document.querySelectorAll(".admin-tab-btn").forEach((btn) => {
+        const active = btn.dataset.tab === tabName;
+        btn.classList.toggle("btn-primary", active);
+    });
+}
+
+function renderPager(containerId, page, limit, total, onPageChange) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = "";
+    const safeLimit = Math.max(1, Number(limit) || 1);
+    const safeTotal = Math.max(0, Number(total) || 0);
+    const totalPages = Math.max(1, Math.ceil(safeTotal / safeLimit));
+    const currentPage = Math.min(Math.max(1, Number(page) || 1), totalPages);
+
+    const info = document.createElement("span");
+    info.style.color = "#aaa";
+    info.textContent = `الصفحة ${toEnglishNumber(currentPage)} من ${toEnglishNumber(totalPages)} (${toEnglishNumber(safeTotal)} نتائج)`;
+
+    const prevBtn = document.createElement("button");
+    prevBtn.className = "btn";
+    prevBtn.textContent = "السابق";
+    prevBtn.disabled = currentPage <= 1;
+    prevBtn.addEventListener("click", () => onPageChange(currentPage - 1));
+
+    const nextBtn = document.createElement("button");
+    nextBtn.className = "btn";
+    nextBtn.textContent = "التالي";
+    nextBtn.disabled = currentPage >= totalPages;
+    nextBtn.addEventListener("click", () => onPageChange(currentPage + 1));
+
+    container.appendChild(info);
+    container.appendChild(prevBtn);
+    container.appendChild(nextBtn);
+}
+
+async function refreshLiveRooms() {
+    const params = new URLSearchParams();
+    const gameType = getValue("liveGameType");
+    const status = getValue("liveStatus");
+    const minPlayers = getValue("liveMinPlayers");
+    const maxPlayers = getValue("liveMaxPlayers");
+    const search = getValue("liveSearch");
+    const sortBy = getValue("liveSortBy");
+    const sortOrder = getValue("liveSortOrder");
+
+    if (gameType) params.set("game_type", gameType);
+    if (status) params.set("status", status);
+    if (minPlayers) params.set("min_players", minPlayers);
+    if (maxPlayers) params.set("max_players", maxPlayers);
+    if (search) params.set("search", search);
+    if (sortBy) params.set("sort_by", sortBy);
+    if (sortOrder) params.set("sort_order", sortOrder);
+
+    const response = await fetch(`/api/admin/dashboard/live-rooms?${params.toString()}`);
+    if (!response.ok) return;
+    const data = await response.json();
+    document.getElementById("adminTotalRooms").textContent = toEnglishNumber(data.total_active_rooms || 0);
+    document.getElementById("adminConnectedUsers").textContent = toEnglishNumber(data.total_connected_users || 0);
 
     const tbody = document.getElementById("adminLiveRoomsBody");
     tbody.innerHTML = "";
-
     const rooms = data.rooms || [];
     if (!rooms.length) {
         const row = document.createElement("tr");
-        row.innerHTML = `<td colspan="7" style="text-align:center; color:#888;">No active rooms</td>`;
+        row.innerHTML = `<td colspan="8" style="text-align:center; color:#888;">لا توجد غرف مطابقة</td>`;
         tbody.appendChild(row);
         return;
     }
 
     rooms.forEach((room) => {
         const row = document.createElement("tr");
+        const players = (room.player_names || []).join(" / ") || "-";
         row.innerHTML = `
             <td>${room.room_code || "-"}</td>
-            <td>${room.game_type || "-"}</td>
-            <td>${room.status || "-"}</td>
-            <td>${room.user_count ?? 0}</td>
-            <td>${(room.player_names || []).join(" / ") || "-"}</td>
+            <td>${mapGameType(room.game_type)}</td>
+            <td>${mapPhase(room.status)}</td>
+            <td>${toEnglishNumber(room.user_count || 0)}</td>
+            <td>${players}</td>
             <td>${formatAdminDate(room.created_at)}</td>
             <td>${formatAdminDate(room.last_activity_at)}</td>
+            <td></td>
         `;
+
+        const actionCell = row.lastElementChild;
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn btn-danger";
+        delBtn.textContent = "حذف الغرفة";
+        delBtn.addEventListener("click", () => deleteLiveRoom(room.game_type, room.room_code));
+        actionCell.appendChild(delBtn);
+
         tbody.appendChild(row);
     });
 }
 
-async function refreshAdminRooms() {
-    const response = await fetch("/api/admin/live-rooms");
+async function deleteLiveRoom(gameType, roomCode) {
+    const confirmed = await openAppConfirm(`هل تريد حذف الغرفة ${roomCode}؟`, {
+        title: "حذف غرفة",
+        confirmLabel: "حذف",
+        cancelLabel: "إلغاء",
+        danger: true,
+    });
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/admin/dashboard/rooms/${encodeURIComponent(gameType)}/${encodeURIComponent(roomCode)}/delete`, {
+        method: "POST",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        await openAppAlert(data.detail || "تعذر حذف الغرفة.", { title: "خطأ", danger: true });
+        return;
+    }
+    await refreshLiveRooms();
+}
+
+async function refreshHistory(resetPage = true) {
+    if (resetPage) historyPage = 1;
+    const params = new URLSearchParams();
+    const gameType = getValue("historyGameType");
+    const endReason = getValue("historyEndReason");
+    const startedAt = getValue("historyStartAt");
+    const endedAt = getValue("historyEndAt");
+    const minPlayers = getValue("historyMinPlayers");
+    const maxPlayers = getValue("historyMaxPlayers");
+    const sortBy = getValue("historySortBy");
+    const sortOrder = getValue("historySortOrder");
+    const rawLimit = Number(getValue("historyLimit")) || historyDefaultLimit;
+    const limit = Math.max(1, rawLimit);
+    const offset = (historyPage - 1) * limit;
+
+    if (gameType) params.set("game_type", gameType);
+    if (endReason) params.set("end_reason", endReason);
+    if (startedAt) params.set("started_at", new Date(startedAt).toISOString());
+    if (endedAt) params.set("ended_at", new Date(endedAt).toISOString());
+    if (minPlayers) params.set("min_players", minPlayers);
+    if (maxPlayers) params.set("max_players", maxPlayers);
+    if (sortBy) params.set("sort_by", sortBy);
+    if (sortOrder) params.set("sort_order", sortOrder);
+    params.set("limit", String(limit));
+    params.set("offset", String(offset));
+
+    const response = await fetch(`/api/admin/dashboard/history?${params.toString()}`);
     if (!response.ok) return;
     const data = await response.json();
-    renderAdminRooms(data);
+    const tbody = document.getElementById("adminHistoryBody");
+    tbody.innerHTML = "";
+    const rows = data.items || [];
+    if (!rows.length) {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td colspan="7" style="text-align:center; color:#888;">لا يوجد سجل ضمن الفلاتر المحددة</td>`;
+        tbody.appendChild(row);
+    } else {
+        rows.forEach((item) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${item.session_id}</td>
+                <td>${mapGameType(item.game_type)}</td>
+                <td>${item.room_code || "-"}</td>
+                <td>${item.host_player_name || "-"}</td>
+                <td>${toEnglishNumber(item.player_count || 0)}</td>
+                <td>${mapEndReason(item.end_reason)}</td>
+                <td>${formatAdminDate(item.ended_at)}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    renderPager("adminHistoryPager", historyPage, limit, data.total || 0, async (nextPage) => {
+        historyPage = nextPage;
+        await refreshHistory(false);
+    });
+}
+
+async function refreshUsers(resetPage = true) {
+    if (resetPage) usersPage = 1;
+    const params = new URLSearchParams();
+    const search = getValue("usersSearch");
+    const sortBy = getValue("usersSortBy");
+    const sortOrder = getValue("usersSortOrder");
+    const rawLimit = Number(getValue("usersLimit")) || usersDefaultLimit;
+    const limit = Math.max(1, rawLimit);
+    const offset = (usersPage - 1) * limit;
+
+    if (search) params.set("search", search);
+    if (sortBy) params.set("sort_by", sortBy);
+    if (sortOrder) params.set("sort_order", sortOrder);
+    params.set("limit", String(limit));
+    params.set("offset", String(offset));
+
+    const response = await fetch(`/api/admin/dashboard/users?${params.toString()}`);
+    if (!response.ok) return;
+    const data = await response.json();
+    document.getElementById("adminUsersTotal").textContent = toEnglishNumber(data.total || 0);
+
+    const tbody = document.getElementById("adminUsersBody");
+    tbody.innerHTML = "";
+    const rows = data.items || [];
+    if (!rows.length) {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td colspan="9" style="text-align:center; color:#888;">لا يوجد مستخدمون</td>`;
+        tbody.appendChild(row);
+    } else {
+        rows.forEach((user) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${toEnglishNumber(user.id)}</td>
+                <td>${user.username || "-"}</td>
+                <td>${user.display_name || "-"}</td>
+                <td>${user.email || "-"}</td>
+                <td>${toEnglishNumber(user.session_count || 0)}</td>
+                <td>${toEnglishNumber(user.win_count || 0)}</td>
+                <td>${user.is_admin ? "نعم" : "لا"}</td>
+                <td>${formatAdminDate(user.created_at)}</td>
+                <td style="white-space:nowrap;"></td>
+            `;
+
+            const actionCell = row.lastElementChild;
+            const editBtn = document.createElement("button");
+            editBtn.className = "btn";
+            editBtn.textContent = "تعديل";
+            editBtn.addEventListener("click", () => openUserEditModal(user));
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.className = "btn btn-danger";
+            deleteBtn.textContent = "حذف";
+            deleteBtn.addEventListener("click", () => deleteUser(user.id, user.username || `#${user.id}`));
+
+            actionCell.appendChild(editBtn);
+            actionCell.appendChild(document.createTextNode(" "));
+            actionCell.appendChild(deleteBtn);
+
+            tbody.appendChild(row);
+        });
+    }
+
+    renderPager("adminUsersPager", usersPage, limit, data.total || 0, async (nextPage) => {
+        usersPage = nextPage;
+        await refreshUsers(false);
+    });
+}
+
+function openUserEditModal(user) {
+    editingUserId = user.id;
+    document.getElementById("adminEditUsername").value = user.username || "";
+    document.getElementById("adminEditDisplayName").value = user.display_name || "";
+    document.getElementById("adminEditEmail").value = user.email || "";
+    document.getElementById("adminEditPassword").value = "";
+    const modal = document.getElementById("adminUserEditModal");
+    modal.classList.remove("hidden");
+    modal.style.display = "flex";
+}
+
+function closeUserEditModal() {
+    editingUserId = null;
+    const modal = document.getElementById("adminUserEditModal");
+    modal.classList.add("hidden");
+    modal.style.display = "none";
+}
+
+async function submitUserEdit() {
+    if (!editingUserId) return;
+    const username = getValue("adminEditUsername").trim();
+    const displayName = getValue("adminEditDisplayName").trim();
+    const email = getValue("adminEditEmail").trim();
+    const newPassword = getValue("adminEditPassword").trim();
+
+    if (!username) {
+        await openAppAlert("اسم المستخدم مطلوب.", { title: "تنبيه" });
+        return;
+    }
+
+    const payload = { username, display_name: displayName, email };
+    if (newPassword) payload.new_password = newPassword;
+
+    const response = await fetch(`/api/admin/dashboard/users/${editingUserId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        await openAppAlert(data.detail || "تعذر تحديث المستخدم.", { title: "خطأ", danger: true });
+        return;
+    }
+
+    closeUserEditModal();
+    await refreshUsers(false);
+}
+
+async function deleteUser(userId, username) {
+    const confirmed = await openAppConfirm(`هل تريد حذف المستخدم ${username}؟`, {
+        title: "حذف مستخدم",
+        confirmLabel: "حذف",
+        cancelLabel: "إلغاء",
+        danger: true,
+    });
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/admin/dashboard/users/${userId}`, { method: "DELETE" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        await openAppAlert(data.detail || "تعذر حذف المستخدم.", { title: "خطأ", danger: true });
+        return;
+    }
+    await refreshUsers(false);
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-    await refreshAdminRooms();
-    setInterval(refreshAdminRooms, 5000);
+    if (!getValue("historyLimit")) document.getElementById("historyLimit").value = String(historyDefaultLimit);
+    if (!getValue("usersLimit")) document.getElementById("usersLimit").value = String(usersDefaultLimit);
+
+    switchAdminTab("live");
+    await Promise.all([refreshLiveRooms(), refreshHistory(true), refreshUsers(true)]);
+
+    const modal = document.getElementById("adminUserEditModal");
+    modal.addEventListener("click", (event) => {
+        if (event.target === modal) closeUserEditModal();
+    });
+
+    setInterval(() => {
+        if (currentAdminTab === "live") refreshLiveRooms();
+    }, 5000);
 });
 </script>
 {% endblock %}
+
