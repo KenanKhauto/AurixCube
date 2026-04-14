@@ -15,6 +15,7 @@ class Player:
 
     id: str
     name: str
+    username: Optional[str] = None
     secret_word: str = ""
     is_undercover: bool = False
     is_eliminated: bool = False
@@ -32,6 +33,8 @@ class UndercoverRoom:
     categories: list[str]    
     max_player_count: int
     undercover_count: int
+    session_id: str = ""
+    room_version: int = 0
     started: bool = False
     ended: bool = False
     end_reason: Optional[str] = None  # e.g., "game_completed", "insufficient_players", "host_deleted"

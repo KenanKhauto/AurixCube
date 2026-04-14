@@ -9,11 +9,12 @@ import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from app.core.exceptions import PlayerNotFoundError, RoomNotFoundError
+from app.core.exceptions import PlayerNotFoundError, RoomNotFoundError, StaleRoomVersionError
 from app.core.utils import generate_room_code
 from app.games.bluff.constants import BLUFF_CATEGORIES
 from app.games.bluff.domain import BluffAnswerOption, BluffPlayer, BluffRoom
 from app.repositories.room_repository import RoomRepository
+from app.services.game_history_service import record_completed_room
 from app.services.room_storage import get_room_repository
 
 SUBMISSION_DURATION_SECONDS = 30
@@ -49,6 +50,7 @@ class BluffGameService:
         room = BluffRoom(
             room_code=room_code,
             host_id=host_id,
+            session_id=str(uuid.uuid4()),
             categories=categories,
             max_player_count=max_player_count,
             total_rounds=total_rounds,
@@ -352,6 +354,7 @@ class BluffGameService:
         room.started = False
         room.ended = False
         room.end_reason = None
+        room.session_id = str(uuid.uuid4())
         room.winner_ids = []
         room.current_round = 1
         room.phase = "waiting"
@@ -647,13 +650,24 @@ class BluffGameService:
         return self._deserialize_room(raw_room)
 
     def _save_room(self, room: BluffRoom, bump_version: bool = True) -> None:
+        previous_version = int(room.room_version)
         if bump_version:
             room.room_version += 1
-        self.room_repository.save_room(room.room_code, self._serialize_room(room))
+        payload = self._serialize_room(room)
+        saved = self.room_repository.save_room(
+            room.room_code,
+            payload,
+            expected_room_version=previous_version,
+        )
+        if not saved:
+            raise StaleRoomVersionError("Room state changed. Please resync.")
+        if room.ended:
+            record_completed_room("bluff", payload)
 
     def _serialize_room(self, room: BluffRoom) -> dict:
         return {
             "room_code": room.room_code,
+            "session_id": room.session_id,
             "room_version": room.room_version,
             "host_id": room.host_id,
             "categories": room.categories,
@@ -710,6 +724,7 @@ class BluffGameService:
         room = BluffRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],
+            session_id=data.get("session_id") or f"bluff:{data['room_code']}:{data['host_id']}",
             room_version=data.get("room_version", 0),
             categories=data.get("categories", []),
             max_player_count=data["max_player_count"],

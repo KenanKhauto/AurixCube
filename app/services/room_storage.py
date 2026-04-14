@@ -21,10 +21,19 @@ class PrefixedRoomRepository(RoomRepository):
     def _scoped_code(self, room_code: str) -> str:
         return f"{self._scope_prefix}{room_code}"
 
-    def save_room(self, room_code: str, room_data: dict) -> None:
+    def save_room(
+        self,
+        room_code: str,
+        room_data: dict,
+        expected_room_version: int | None = None,
+    ) -> bool:
         payload = dict(room_data)
         payload.setdefault("game_type", self._scope)
-        self._base_repository.save_room(self._scoped_code(room_code), payload)
+        return self._base_repository.save_room(
+            self._scoped_code(room_code),
+            payload,
+            expected_room_version=expected_room_version,
+        )
 
     def get_room(self, room_code: str) -> dict | None:
         return self._base_repository.get_room(self._scoped_code(room_code))

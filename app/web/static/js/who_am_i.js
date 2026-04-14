@@ -283,7 +283,8 @@ async function updateWhoAmILobbyCharacter(characterId) {
     });
     const data = await response.json();
     if (!response.ok) {
-        showWhoAmIError(data.detail || "Unable to update character.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "Unable to update character."));
         return;
     }
     selectedCharacter = characterId;
@@ -437,7 +438,8 @@ async function createRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "حدث خطأ أثناء إنشاء الغرفة."));
         return;
     }
 
@@ -477,7 +479,8 @@ async function joinRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر الانضمام إلى الغرفة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر الانضمام إلى الغرفة."));
         return;
     }
 
@@ -508,7 +511,8 @@ async function startGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر بدء اللعبة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر بدء اللعبة."));
         return;
     }
 
@@ -531,7 +535,8 @@ async function advanceRevealPhase() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر الانتقال للاعب التالي.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر الانتقال للاعب التالي."));
         return;
     }
 
@@ -566,7 +571,8 @@ async function submitGuess() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر إرسال التخمين.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر إرسال التخمين."));
         return;
     }
 
@@ -619,7 +625,8 @@ async function restartGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر إعادة اللعبة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر إعادة اللعبة."));
         return;
     }
 
@@ -643,7 +650,8 @@ async function leaveCurrentRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر الخروج من الغرفة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر الخروج من الغرفة."));
         return;
     }
 
@@ -669,7 +677,8 @@ async function deleteCurrentRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر حذف الغرفة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر حذف الغرفة."));
         return;
     }
 
@@ -709,7 +718,7 @@ async function removeWhoAmIPlayer(playerIdToRemove) {
             await handleWhoAmIRoomExit("تم حذف الغرفة أو لم تعد متاحة.");
             return;
         }
-        showWhoAmIError(data.detail || "تعذر حذف اللاعب من الغرفة.");
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر حذف اللاعب من الغرفة."));
         return;
     }
 
@@ -1166,7 +1175,8 @@ async function toggleCategory(categoryKey) {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر تحديث التصنيفات.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر تحديث التصنيفات."));
         return;
     }
 
@@ -1258,7 +1268,8 @@ async function createRoom() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "حدث خطأ أثناء إنشاء الغرفة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "حدث خطأ أثناء إنشاء الغرفة."));
         return;
     }
 
@@ -1292,7 +1303,8 @@ async function startGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر بدء اللعبة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر بدء اللعبة."));
         return;
     }
 
@@ -1324,7 +1336,8 @@ async function restartGame() {
     const data = await response.json();
 
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر إعادة اللعبة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر إعادة اللعبة."));
         return;
     }
 
@@ -1483,6 +1496,7 @@ let whoAmIWSShouldReconnect = false;
 let whoAmIWSReconnectTimer = null;
 let whoAmIActionCounter = 0;
 let latestWhoAmIRoomVersion = 0;
+let whoAmIStaleResyncCount = 0;
 const pendingWhoAmIActions = new Map();
 
 function nextWhoAmIActionId() {
@@ -1620,6 +1634,31 @@ async function applyWhoAmIStateSync(state) {
         return;
     }
     renderPlayScreen(state);
+}
+
+function getWhoAmIErrorMessage(data, fallbackMessage) {
+    const detail = data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (detail && typeof detail === "object" && typeof detail.message === "string" && detail.message.trim()) {
+        return detail.message;
+    }
+    return fallbackMessage;
+}
+
+async function tryWhoAmIStaleResync(response, data) {
+    if (response?.status !== 409) return false;
+    const staleState = data?.detail?.state;
+    if (!staleState || typeof staleState !== "object") return false;
+    whoAmIStaleResyncCount += 1;
+    console.debug("[who-am-i] stale resync", {
+        count: whoAmIStaleResyncCount,
+        roomCode: currentRoomCode,
+        localVersion: latestWhoAmIRoomVersion,
+        serverVersion: Number(staleState.room_version || 0),
+    });
+    await applyWhoAmIStateSync(staleState);
+    hideWhoAmIError();
+    return true;
 }
 
 function connectWhoAmIWS(roomCode) {
@@ -1774,7 +1813,8 @@ toggleCategory = async function(categoryKey) {
     });
     const data = await response.json();
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر تحديث التصنيفات.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر تحديث التصنيفات."));
         return;
     }
     await applyWhoAmIStateSync(data);
@@ -1797,7 +1837,8 @@ startGame = async function() {
     const response = await fetch(`/api/who-am-i/rooms/${currentRoomCode}/start`, { method: "POST" });
     const data = await response.json();
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر بدء اللعبة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر بدء اللعبة."));
         return;
     }
     await applyWhoAmIStateSync(data);
@@ -1820,7 +1861,8 @@ advanceRevealPhase = async function() {
     });
     const data = await response.json();
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر الانتقال للاعب التالي.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر الانتقال للاعب التالي."));
         return;
     }
     await applyWhoAmIStateSync(data);
@@ -1853,7 +1895,8 @@ submitGuess = async function() {
     });
     const data = await response.json();
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر إرسال التخمين.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر إرسال التخمين."));
         return;
     }
     if (guessInput) guessInput.value = "";
@@ -1887,7 +1930,8 @@ restartGame = async function() {
     });
     const data = await response.json();
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر إعادة اللعبة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر إعادة اللعبة."));
         return;
     }
     await applyWhoAmIStateSync(data);
@@ -1914,7 +1958,8 @@ removeWhoAmIPlayer = async function(playerIdToRemove) {
     });
     const data = await response.json();
     if (!response.ok) {
-        showWhoAmIError(data.detail || "تعذر حذف اللاعب من الغرفة.");
+        if (await tryWhoAmIStaleResync(response, data)) return;
+        showWhoAmIError(getWhoAmIErrorMessage(data, "تعذر حذف اللاعب من الغرفة."));
         return;
     }
     await applyWhoAmIStateSync(data);
@@ -1948,3 +1993,7 @@ refreshRoomState = async function() {
     if (whoAmIWS?.readyState === WebSocket.OPEN) return;
     await originalWhoAmIRefreshRoomState();
 };
+
+
+
+

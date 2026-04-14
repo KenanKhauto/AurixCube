@@ -66,6 +66,7 @@ class RoomStateResponse(BaseModel):
     """Serialized room state."""
 
     room_code: str
+    room_version: int
     host_id: str
     categories: list[str]
     max_player_count: int

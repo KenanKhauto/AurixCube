@@ -34,6 +34,7 @@ class WhoAmIRoom:
     room_code: str
     host_id: str
     max_player_count: int
+    session_id: str = ""
     room_version: int = 0
     started: bool = False
     ended: bool = False

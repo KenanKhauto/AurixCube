@@ -12,13 +12,21 @@ class RoomRepository(ABC):
     """
 
     @abstractmethod
-    def save_room(self, room_code: str, room_data: dict) -> None:
+    def save_room(
+        self,
+        room_code: str,
+        room_data: dict,
+        expected_room_version: int | None = None,
+    ) -> bool:
         """
         Save or update a room.
 
         Args:
             room_code: Unique room code.
             room_data: Serialized room state.
+
+        Returns:
+            True when saved; False when CAS expectation fails.
         """
         raise NotImplementedError
 

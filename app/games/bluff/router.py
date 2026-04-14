@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.auth.dependencies import get_current_user_optional
+from app.core.exceptions import StaleRoomVersionError
 from app.db.models.user import User
 from app.games.bluff.constants import BLUFF_CATEGORIES
 from app.games.bluff.schemas import (
@@ -32,6 +33,22 @@ from app.services.analytics import track_event_async
 router = APIRouter()
 service = BluffGameService()
 logger = logging.getLogger(__name__)
+
+
+def _stale_room_http(room_code: str, exc: Exception) -> HTTPException:
+    state = None
+    try:
+        state = build_room_response(service.get_room_state(room_code)).model_dump()
+    except Exception:
+        state = None
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": "stale_room_version",
+            "message": str(exc),
+            "state": state,
+        },
+    )
 
 
 def build_room_response(room) -> BluffRoomStateResponse:
@@ -146,6 +163,8 @@ async def join_room(
         )
         return response
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         logger.warning(
             "Bluff join failed room=%s player_name=%s auth_user=%s error=%s",
             room_code,
@@ -163,6 +182,8 @@ def update_character(room_code: str, payload: BluffUpdateCharacterRequest):
         room = service.update_character(room_code, payload.player_id, payload.character_id)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -184,6 +205,8 @@ def start_room(room_code: str):
         )
         return response
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -194,6 +217,8 @@ def get_room(room_code: str):
         room = service.get_room_state(room_code)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
@@ -204,6 +229,8 @@ def update_categories(room_code: str, payload: BluffUpdateCategoriesRequest):
         room = service.update_categories(room_code, payload.host_id, payload.categories)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -214,6 +241,8 @@ def select_category(room_code: str, payload: BluffSelectCategoryRequest):
         room = service.select_category(room_code, payload.player_id, payload.category)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -224,6 +253,8 @@ def submit_answer(room_code: str, payload: BluffSubmitAnswerRequest):
         room = service.submit_answer(room_code, payload.player_id, payload.answer_text)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -234,6 +265,8 @@ def submit_pick(room_code: str, payload: BluffSubmitPickRequest):
         room = service.submit_pick(room_code, payload.player_id, payload.option_id)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -244,6 +277,8 @@ def advance_round(room_code: str, payload: BluffAdvanceRoundRequest):
         room = service.advance_round(room_code, payload.player_id)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -254,6 +289,8 @@ def restart_room(room_code: str, payload: BluffRestartGameRequest):
         room = service.restart_game(room_code, payload.categories, payload.total_rounds, payload.round_timer_seconds,)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -264,6 +301,8 @@ def remove_player(room_code: str, payload: BluffRemovePlayerRequest):
         room = service.remove_player(room_code, payload.host_id, payload.player_id_to_remove)
         return build_room_response(room)
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -296,6 +335,8 @@ def heartbeat(room_code: str, payload: BluffLeaveRoomRequest):  # reuse the sche
         service.heartbeat(room_code, payload.player_id)
         return {"message": "Heartbeat received."}
     except Exception as exc:
+        if isinstance(exc, StaleRoomVersionError):
+            raise _stale_room_http(room_code, exc) from exc
         logger.warning(
             "Bluff heartbeat failed room=%s player=%s error=%s",
             room_code,
@@ -423,6 +464,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str):
                 await broadcast_state()
                 await send_action_ack(player_id, action_id)
             except Exception as exc:
+                if isinstance(exc, StaleRoomVersionError):
+                    await send_state_to_player(player_id)
                 await send_action_error(player_id, action_id, str(exc))
 
     except WebSocketDisconnect:

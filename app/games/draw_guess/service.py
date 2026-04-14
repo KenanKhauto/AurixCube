@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from rapidfuzz import fuzz
 
-from app.core.exceptions import PlayerNotFoundError, RoomNotFoundError
+from app.core.exceptions import PlayerNotFoundError, RoomNotFoundError, StaleRoomVersionError
 from app.core.utils import generate_room_code
 from app.games.draw_guess.constants import DRAW_CATEGORIES
 from app.games.draw_guess.domain import (
@@ -21,6 +21,7 @@ from app.games.draw_guess.domain import (
     DrawGuessWordOption,
 )
 from app.repositories.room_repository import RoomRepository
+from app.services.game_history_service import record_completed_room
 from app.services.room_storage import get_room_repository
 
 CLOSE_GUESS_THRESHOLD = 88
@@ -51,6 +52,7 @@ class DrawGuessGameService:
         room = DrawGuessRoom(
             room_code=room_code,
             host_id=host_id,
+            session_id=str(uuid.uuid4()),
             max_player_count=max_player_count,
             total_rounds=total_rounds,
             categories=categories,
@@ -354,6 +356,7 @@ class DrawGuessGameService:
         room.started = False
         room.ended = False
         room.end_reason = None
+        room.session_id = str(uuid.uuid4())
         room.winner_ids = []
         room.current_round = 1
         room.phase = "waiting"
@@ -594,13 +597,24 @@ class DrawGuessGameService:
         return self._deserialize_room(raw_room)
 
     def _save_room(self, room: DrawGuessRoom, bump_version: bool = True) -> None:
+        previous_version = int(room.room_version)
         if bump_version:
             room.room_version += 1
-        self.room_repository.save_room(room.room_code, self._serialize_room(room))
+        payload = self._serialize_room(room)
+        saved = self.room_repository.save_room(
+            room.room_code,
+            payload,
+            expected_room_version=previous_version,
+        )
+        if not saved:
+            raise StaleRoomVersionError("Room state changed. Please resync.")
+        if room.ended:
+            record_completed_room("draw_guess", payload)
 
     def _serialize_room(self, room: DrawGuessRoom) -> dict:
         return {
             "room_code": room.room_code,
+            "session_id": room.session_id,
             "room_version": room.room_version,
             "host_id": room.host_id,
             "max_player_count": room.max_player_count,
@@ -683,6 +697,7 @@ class DrawGuessGameService:
         room = DrawGuessRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],
+            session_id=data.get("session_id") or f"draw_guess:{data['room_code']}:{data['host_id']}",
             room_version=data.get("room_version", 0),
             max_player_count=data["max_player_count"],
             total_rounds=data["total_rounds"],

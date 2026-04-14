@@ -42,18 +42,41 @@ class RedisRoomRepository(RoomRepository):
         """
         return f"{self._key_prefix}{room_code}"
 
-    def save_room(self, room_code: str, room_data: dict) -> None:
+    def save_room(
+        self,
+        room_code: str,
+        room_data: dict,
+        expected_room_version: int | None = None,
+    ) -> bool:
         """
         Save or update a room in Redis.
         """
         key = self._make_key(room_code)
-        existing = self.get_room(room_code) or {}
-        now_iso = datetime.now(timezone.utc).isoformat()
-        payload_data = dict(room_data)
-        payload_data["_meta_created_at"] = existing.get("_meta_created_at", now_iso)
-        payload_data["_meta_updated_at"] = now_iso
-        payload = json.dumps(payload_data)
-        self._client.set(name=key, value=payload, ex=self._ttl_seconds)
+        for _ in range(5):
+            with self._client.pipeline() as pipe:
+                try:
+                    pipe.watch(key)
+                    raw_existing = pipe.get(key)
+                    existing = json.loads(raw_existing) if raw_existing else {}
+                    current_version = int(existing.get("room_version", 0)) if existing else 0
+                    if expected_room_version is not None and current_version != expected_room_version:
+                        pipe.unwatch()
+                        return False
+
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    payload_data = dict(room_data)
+                    payload_data["_meta_created_at"] = existing.get("_meta_created_at", now_iso)
+                    payload_data["_meta_updated_at"] = now_iso
+                    payload = json.dumps(payload_data)
+
+                    pipe.multi()
+                    pipe.set(name=key, value=payload, ex=self._ttl_seconds)
+                    pipe.execute()
+                    return True
+                except redis.WatchError:
+                    continue
+
+        return False
 
     def get_room(self, room_code: str) -> Optional[dict]:
         """
