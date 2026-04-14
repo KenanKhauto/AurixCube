@@ -132,6 +132,49 @@
     text-shadow: 0 0 8px rgba(242, 193, 75, 0.45);
 }
 
+.notification-dropdown {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.notification-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(92vw, 420px);
+    max-height: 70vh;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid rgba(214, 176, 106, 0.28);
+    background: linear-gradient(180deg, rgba(22, 16, 10, 0.99), rgba(10, 8, 6, 0.99));
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+    z-index: 1200;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    pointer-events: none;
+}
+
+.notification-dropdown-menu.is-open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.notification-dropdown-header {
+    padding: 12px 14px;
+    color: var(--brand-gold-strong);
+    font-weight: 800;
+    border-bottom: 1px solid rgba(214, 176, 106, 0.2);
+}
+
+.notification-dropdown-body {
+    padding: 10px;
+    max-height: calc(70vh - 52px);
+    overflow-y: auto;
+}
+
 .logo {
     display: flex;
     align-items: center;

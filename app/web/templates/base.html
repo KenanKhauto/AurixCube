@@ -48,10 +48,18 @@
         <!-- RIGHT -->
         <div class="nav-right">
             {% if current_user %}
-                <button type="button" class="nav-action-btn nav-game-requests-btn" onclick="showGameRequests()" aria-label="الإشعارات" title="الإشعارات">
-                    <i class="fa-solid fa-bell"></i>
-                    <span id="notificationBadge" class="notification-badge hidden">0</span>
-                </button>
+                <div class="notification-dropdown">
+                    <button type="button" class="nav-action-btn nav-game-requests-btn" onclick="showGameRequests(event)" aria-label="الإشعارات" title="الإشعارات">
+                        <i class="fa-solid fa-bell"></i>
+                        <span id="notificationBadge" class="notification-badge hidden">0</span>
+                    </button>
+                    <div id="notificationDropdown" class="notification-dropdown-menu hidden">
+                        <div class="notification-dropdown-header">الإشعارات</div>
+                        <div id="notificationDropdownBody" class="notification-dropdown-body">
+                            <div class="app-list-empty">جاري التحميل...</div>
+                        </div>
+                    </div>
+                </div>
                 <div class="profile-dropdown">
                     {% set nav_profile_image = current_user.profile_image or 'profile_img_default.png' %}
                     <img
@@ -62,7 +70,7 @@
                         onerror="this.onerror=null;this.src='/static/images/profile_img_default.png';"
                     >
                     <div id="profileDropdown" class="profile-dropdown-menu hidden">
-                        <a href="/profile">الملف الشخصي</a>
+                        <a href="/profile">????? ??????</a>
                         <a href="/profile/game-history">&#1587;&#1580;&#1604; &#1575;&#1604;&#1604;&#1593;&#1576;</a>
                         <a href="/admin/live">لوحة الإدارة</a>
                         <form method="post" action="/logout" class="profile-dropdown-logout-form">
@@ -344,7 +352,7 @@ function openAppDialog(options) {
     const {
         title = "تنبيه",
         message = "",
-        confirmLabel = "موافق",
+        confirmLabel = "?????",
         cancelLabel = "إلغاء",
         showCancel = false,
         danger = false,
@@ -479,7 +487,7 @@ function buildInviteNotificationCard(invite) {
     const statusLabels = {
         pending: "بانتظار ردك",
         accepted: "تم القبول",
-        rejected: "تم الرفض",
+        rejected: "?? ?????",
     };
 
     wrapper.innerHTML = `
@@ -488,7 +496,7 @@ function buildInviteNotificationCard(invite) {
             <div class="app-list-meta">
                 <div class="app-list-title">${senderName}</div>
                 <div class="app-list-subtitle">دعاك للانضمام إلى ${gameNames[invite.game_key] || invite.game_key}</div>
-                <div class="app-list-footnote">كود الغرفة: ${invite.room_code} • ${statusLabels[invite.status] || invite.status}</div>
+                <div class="app-list-footnote">??? ??????: ${invite.room_code} ? ${statusLabels[invite.status] || invite.status}</div>
             </div>
         </div>
     `;
@@ -588,7 +596,12 @@ function buildFriendRequestNotificationCard(user) {
     return wrapper;
 }
 
-async function loadNotificationsPanel() {
+async function renderNotificationsDropdown() {
+    const dropdownBody = document.getElementById("notificationDropdownBody");
+    if (!dropdownBody) return;
+
+    dropdownBody.innerHTML = '<div class="app-list-empty">جاري التحميل...</div>';
+
     const [invitesResponse, requestsResponse] = await Promise.all([
         fetch("/invites"),
         fetch("/friends/requests")
@@ -602,7 +615,6 @@ async function loadNotificationsPanel() {
 
     let hasContent = false;
 
-    // Add friend requests section
     if (friendRequests.length > 0) {
         hasContent = true;
         const requestsHeader = document.createElement("div");
@@ -613,15 +625,15 @@ async function loadNotificationsPanel() {
         friendRequests.forEach((user) => body.appendChild(buildFriendRequestNotificationCard(user)));
     }
 
-    // Add game invites section
-    if (invites.length > 0) {
+    const pendingInvites = invites.filter((invite) => invite.status === "pending");
+    if (pendingInvites.length > 0) {
         hasContent = true;
         const invitesHeader = document.createElement("div");
         invitesHeader.className = "app-list-section-header";
         invitesHeader.textContent = "دعوات اللعب";
         body.appendChild(invitesHeader);
 
-        invites.forEach((invite) => body.appendChild(buildInviteNotificationCard(invite)));
+        pendingInvites.forEach((invite) => body.appendChild(buildInviteNotificationCard(invite)));
     }
 
     if (!hasContent) {
@@ -631,10 +643,38 @@ async function loadNotificationsPanel() {
         body.appendChild(empty);
     }
 
-    openAppPanel({
-        title: "الإشعارات",
-        bodyNode: body,
+    dropdownBody.innerHTML = "";
+    dropdownBody.appendChild(body);
+}
+
+function openNotificationsDropdown() {
+    const dropdown = document.getElementById("notificationDropdown");
+    if (!dropdown) return;
+    dropdown.classList.remove("hidden");
+    requestAnimationFrame(() => {
+        dropdown.classList.add("is-open");
     });
+}
+
+function closeNotificationsDropdown() {
+    const dropdown = document.getElementById("notificationDropdown");
+    if (!dropdown) return;
+    dropdown.classList.remove("is-open");
+    window.setTimeout(() => {
+        if (!dropdown.classList.contains("is-open")) {
+            dropdown.classList.add("hidden");
+        }
+    }, 180);
+}
+
+function isNotificationsDropdownOpen() {
+    const dropdown = document.getElementById("notificationDropdown");
+    return !!dropdown && dropdown.classList.contains("is-open");
+}
+
+async function loadNotificationsPanel() {
+    await renderNotificationsDropdown();
+    openNotificationsDropdown();
 }
 
 async function openInviteFriendsModal(gameKey, roomCode) {
@@ -751,7 +791,7 @@ async function respondToFriendRequest(requesterId, action) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-        await openAppAlert(data.detail || `تعذر ${action === "accept" ? "قبول" : "رفض"} طلب الصداقة.`, {
+        await openAppAlert(data.detail || `???? ${action === "accept" ? "????" : "???"} ??? ???????.`, {
             title: "خطأ",
             confirmLabel: "إغلاق",
             danger: true,
@@ -759,7 +799,7 @@ async function respondToFriendRequest(requesterId, action) {
         return;
     }
 
-    await openAppAlert(`تم ${action === "accept" ? "قبول" : "رفض"} طلب الصداقة بنجاح.`, {
+    await openAppAlert(`?? ${action === "accept" ? "????" : "???"} ??? ??????? ?????.`, {
         title: "تم التحديث",
         confirmLabel: "حسناً",
     });
@@ -775,8 +815,16 @@ function toggleProfileDropdown() {
     }
 }
 
-function showGameRequests() {
-    loadNotificationsPanel();
+async function showGameRequests(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (isNotificationsDropdownOpen()) {
+        closeNotificationsDropdown();
+        return;
+    }
+    await loadNotificationsPanel();
 }
 
 function connectNotificationWebSocket() {
@@ -845,12 +893,20 @@ async function updateNotificationBadge() {
 window.updateNotificationBadge = updateNotificationBadge;
 
 document.addEventListener("click", function(event) {
-    const dropdown = document.getElementById("profileDropdown");
-    const trigger = document.querySelector(".profile-trigger");
+    const profileDropdown = document.getElementById("profileDropdown");
+    const profileTrigger = document.querySelector(".profile-trigger");
 
-    if (dropdown && trigger && !dropdown.classList.contains("hidden")) {
-        if (!trigger.contains(event.target) && !dropdown.contains(event.target)) {
-            dropdown.classList.add("hidden");
+    if (profileDropdown && profileTrigger && !profileDropdown.classList.contains("hidden")) {
+        if (!profileTrigger.contains(event.target) && !profileDropdown.contains(event.target)) {
+            profileDropdown.classList.add("hidden");
+        }
+    }
+
+    const notificationMenu = document.getElementById("notificationDropdown");
+    const notificationRoot = document.querySelector(".notification-dropdown");
+    if (notificationMenu && notificationRoot && !notificationMenu.classList.contains("hidden")) {
+        if (!notificationRoot.contains(event.target)) {
+            closeNotificationsDropdown();
         }
     }
 });
@@ -870,3 +926,6 @@ if (document.querySelector(".nav-game-requests-btn")) {
 
 </body>
 </html>
+
+
+
