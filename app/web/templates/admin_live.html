@@ -424,14 +424,21 @@ async function refreshLiveRooms() {
             <td>${players}</td>
             <td>${formatAdminDate(room.created_at)}</td>
             <td>${formatAdminDate(room.last_activity_at)}</td>
-            <td></td>
+            <td style="white-space:nowrap;"></td>
         `;
 
         const actionCell = row.lastElementChild;
         const delBtn = document.createElement("button");
         delBtn.className = "btn btn-danger";
+        delBtn.style.width = "auto";
+        delBtn.style.margin = "0";
+        delBtn.style.padding = "6px 10px";
+        delBtn.style.fontSize = "13px";
         delBtn.textContent = "حذف الغرفة";
         delBtn.addEventListener("click", () => deleteLiveRoom(room.game_type, room.room_code));
+        actionCell.style.display = "flex";
+        actionCell.style.justifyContent = "center";
+        actionCell.style.alignItems = "center";
         actionCell.appendChild(delBtn);
 
         tbody.appendChild(row);
@@ -562,16 +569,27 @@ async function refreshUsers(resetPage = true) {
             const actionCell = row.lastElementChild;
             const editBtn = document.createElement("button");
             editBtn.className = "btn";
+            editBtn.style.width = "auto";
+            editBtn.style.margin = "0";
+            editBtn.style.padding = "6px 10px";
+            editBtn.style.fontSize = "13px";
             editBtn.textContent = "تعديل";
             editBtn.addEventListener("click", () => openUserEditModal(user));
 
             const deleteBtn = document.createElement("button");
             deleteBtn.className = "btn btn-danger";
+            deleteBtn.style.width = "auto";
+            deleteBtn.style.margin = "0";
+            deleteBtn.style.padding = "6px 10px";
+            deleteBtn.style.fontSize = "13px";
             deleteBtn.textContent = "حذف";
             deleteBtn.addEventListener("click", () => deleteUser(user.id, user.username || `#${user.id}`));
 
+            actionCell.style.display = "flex";
+            actionCell.style.gap = "6px";
+            actionCell.style.justifyContent = "center";
+            actionCell.style.alignItems = "center";
             actionCell.appendChild(editBtn);
-            actionCell.appendChild(document.createTextNode(" "));
             actionCell.appendChild(deleteBtn);
 
             tbody.appendChild(row);
