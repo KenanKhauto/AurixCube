@@ -26,7 +26,7 @@ class BluffGameService:
     """
 
     def __init__(self, room_repository: RoomRepository | None = None) -> None:
-        self.room_repository = room_repository or get_room_repository()
+        self.room_repository = room_repository or get_room_repository("bluff")
 
     def create_room(
         self,
@@ -74,6 +74,9 @@ class BluffGameService:
 
         if len(room.players) >= room.max_player_count:
             raise ValueError("Room is full.")
+
+        if any(player.name == player_name for player in room.players.values()):
+            raise ValueError("Player name already exists in this room.")
 
         # Allow joining mid-game, new player starts with 0 points
         player_id = str(uuid.uuid4())
@@ -699,6 +702,11 @@ class BluffGameService:
         }
 
     def _deserialize_room(self, data: dict) -> BluffRoom:
+        if data.get("game_type") not in (None, "bluff"):
+            raise RoomNotFoundError("Room not found.")
+        if "total_rounds" not in data:
+            raise RoomNotFoundError("Room not found.")
+
         room = BluffRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],

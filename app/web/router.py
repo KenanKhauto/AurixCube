@@ -171,6 +171,10 @@ def draw_guess_page(
 
 
 def _infer_game_type(room_data: dict) -> str:
+    game_type = room_data.get("game_type")
+    if isinstance(game_type, str) and game_type:
+        return game_type
+
     if "undercover_count" in room_data:
         return "undercover"
     if "reveal_phase_active" in room_data:
@@ -195,7 +199,16 @@ def _build_live_room_snapshot() -> dict:
     raw_rooms = repository.list_rooms()
 
     room_items: list[dict] = []
-    for room_code, room_data in raw_rooms.items():
+    for storage_room_code, room_data in raw_rooms.items():
+        storage_prefix = ""
+        room_code = storage_room_code
+        if ":" in storage_room_code:
+            storage_prefix, room_code = storage_room_code.split(":", 1)
+
+        inferred_game_type = _infer_game_type(room_data)
+        if inferred_game_type == "unknown" and storage_prefix in {"bluff", "draw_guess", "who_am_i", "undercover"}:
+            inferred_game_type = storage_prefix
+
         players = list((room_data.get("players") or {}).values())
 
         player_names = [player.get("name") for player in players if player.get("name")]
@@ -204,7 +217,7 @@ def _build_live_room_snapshot() -> dict:
         room_items.append(
             {
                 "room_code": room_code,
-                "game_type": _infer_game_type(room_data),
+                "game_type": inferred_game_type,
                 "status": _room_status(room_data),
                 "user_count": len(players),
                 "player_names": player_names,

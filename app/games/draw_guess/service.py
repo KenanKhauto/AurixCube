@@ -28,7 +28,7 @@ CLOSE_GUESS_THRESHOLD = 88
 
 class DrawGuessGameService:
     def __init__(self, room_repository: RoomRepository | None = None) -> None:
-        self.room_repository = room_repository or get_room_repository()
+        self.room_repository = room_repository or get_room_repository("draw_guess")
 
     def create_room(
         self,
@@ -677,6 +677,9 @@ class DrawGuessGameService:
         }
 
     def _deserialize_room(self, data: dict) -> DrawGuessRoom:
+        if data.get("game_type") not in (None, "draw_guess"):
+            raise RoomNotFoundError("Room not found.")
+
         room = DrawGuessRoom(
             room_code=data["room_code"],
             host_id=data["host_id"],

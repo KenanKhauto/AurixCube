@@ -146,6 +146,13 @@ async def join_room(
         )
         return response
     except Exception as exc:
+        logger.warning(
+            "Bluff join failed room=%s player_name=%s auth_user=%s error=%s",
+            room_code,
+            payload.player_name,
+            current_user.username if current_user else None,
+            exc,
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -289,6 +296,12 @@ def heartbeat(room_code: str, payload: BluffLeaveRoomRequest):  # reuse the sche
         service.heartbeat(room_code, payload.player_id)
         return {"message": "Heartbeat received."}
     except Exception as exc:
+        logger.warning(
+            "Bluff heartbeat failed room=%s player=%s error=%s",
+            room_code,
+            payload.player_id,
+            exc,
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
