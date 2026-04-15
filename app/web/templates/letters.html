@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}حروف{% endblock %}
+
+{% block content %}
+<div class="{{ theme_class }}">
+    <div id="letters-global-error" class="error-box hidden"></div>
+
+    <div id="screen-letters-lobby" class="card glow-border">
+        <div class="game-title-box">
+            <img src="/static/images/main_logo.png" class="game-title-logo" alt="AurixCube">
+            <span class="game-title-text">حروف</span>
+        </div>
+
+        <input type="text" id="lettersName" placeholder="اسمك المستعار...">
+
+        <label>اختر الشخصية:</label>
+        <div class="letters-character-picker">
+            <img id="lettersCharacterPreview" class="letters-character-preview" src="/static/images/char1.png" alt="selected character">
+            <div id="lettersCharacterGrid" class="letters-character-grid"></div>
+        </div>
+
+        <button class="btn btn-primary" onclick="showLettersSetup()">إنشاء غرفة جديدة</button>
+
+        <div class="letters-separator">أو انضمام للغرفة</div>
+
+        <input type="text" id="lettersRoomInput" placeholder="كود الغرفة">
+        <button class="btn" onclick="joinLettersRoom()">انضمام للغرفة</button>
+    </div>
+
+    <div id="screen-letters-setup" class="card hidden">
+        <h2 style="color:var(--primary)">إعدادات اللعبة</h2>
+
+        <label>عدد اللاعبين:</label>
+        <div id="lettersPlayerCountGrid" class="category-grid"></div>
+
+        <label>عدد الجولات:</label>
+        <div id="lettersRoundsGrid" class="category-grid"></div>
+
+        <label>مدة الإجابة:</label>
+        <div id="lettersTimerGrid" class="category-grid"></div>
+
+        <label>الانتهاء المبكر:</label>
+        <div id="lettersDoneGrid" class="category-grid"></div>
+
+        <label class="letters-toggle-row">
+            <input type="checkbox" id="lettersNoTimerToggle">
+            <span>بدون مؤقت للإجابة</span>
+        </label>
+
+        <button id="lettersSetupConfirmButton" class="btn btn-primary" onclick="createLettersRoom()">تأكيد الإعدادات</button>
+        <button class="btn" onclick="goBackToLettersLobby()">رجوع</button>
+    </div>
+
+    <div id="screen-letters-wait" class="card hidden">
+        <h3>كود الغرفة: <span id="lettersDisplayCode" style="color:var(--primary)"></span></h3>
+
+        <div class="letters-character-picker" style="margin-bottom: 14px;">
+            <img id="lettersWaitCharacterPreview" class="letters-character-preview" src="/static/images/char1.png" alt="selected character">
+            <div id="lettersWaitCharacterGrid" class="letters-character-grid"></div>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="bluff-table letters-players-table">
+                <thead>
+                    <tr>
+                        <th>اللاعب</th>
+                        <th>النقاط</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="lettersPlayerList"></tbody>
+            </table>
+        </div>
+
+        <div id="lettersSettingsSummary" class="letters-settings-summary"></div>
+
+        <div class="letters-settings-summary">
+            <div class="letters-settings-card">
+                <div class="letters-section-head">
+                    <h4>التصنيفات</h4>
+                    <div id="lettersCategorySelectionInfo" class="letters-category-info"></div>
+                </div>
+
+                <label>التصنيفات الجاهزة:</label>
+                <div id="lettersPresetGrid" class="category-grid"></div>
+
+                <label>تصنيفات مخصصة:</label>
+                <div class="letters-custom-category-row">
+                    <input type="text" id="lettersCustomCategoryInput" placeholder="أضف تصنيفًا جديدًا">
+                    <button type="button" class="btn letters-inline-btn" onclick="addLettersCustomCategory()">إضافة</button>
+                </div>
+                <div id="lettersCustomCategoryList" class="letters-chip-list"></div>
+            </div>
+        </div>
+
+        <div id="lettersHostArea" class="hidden">
+            <button class="btn" onclick="openLettersSettingsEditorFromRoom()">تعديل الإعدادات</button>
+            <button class="btn btn-primary" onclick="startLettersGame()">ابدأ اللعبة الآن</button>
+            <button class="btn letters-room-delete" onclick="deleteLettersRoom()">حذف الغرفة</button>
+        </div>
+
+        <div id="lettersMemberArea" class="hidden">
+            <button class="btn letters-room-leave" onclick="leaveLettersRoom()">خروج من الغرفة</button>
+        </div>
+    </div>
+
+    <div id="screen-letters-choose" class="card hidden">
+        <div id="lettersRoundInfoChoose" class="round-meta"></div>
+        <div id="lettersChooserInfo" class="phase-info"></div>
+        <div id="lettersLetterGrid" class="letters-letter-grid"></div>
+        <div id="lettersHostNextChoose" class="hidden" style="margin-top:14px;">
+            <button class="btn btn-primary" onclick="nextLettersPhase()">التالي</button>
+        </div>
+    </div>
+
+    <div id="screen-letters-answer" class="card hidden">
+        <div id="lettersRoundInfoAnswer" class="round-meta"></div>
+        <div id="lettersTimerAnswer" class="bluff-timer"></div>
+        <div id="lettersAnswerPhaseInfo" class="phase-info"></div>
+        <div id="lettersDoneInfo" class="phase-meta-line"></div>
+
+        <div class="letters-answer-table">
+            <div id="lettersAnswerLetterBadge" class="letters-letter-badge"></div>
+            <div id="lettersAnswerGrid" class="letters-answer-grid"></div>
+        </div>
+
+        <button id="lettersDoneButton" class="btn btn-primary" onclick="pressLettersDone()">انتهيت</button>
+        <div id="lettersHostNextAnswer" class="hidden" style="margin-top:10px;">
+            <button class="btn btn-primary" onclick="nextLettersPhase()">التالي</button>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="bluff-table letters-players-table">
+                <thead>
+                    <tr>
+                        <th>اللاعب</th>
+                        <th>النقاط</th>
+                    </tr>
+                </thead>
+                <tbody id="lettersScoreboardAnswer"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="screen-letters-reveal" class="card hidden">
+        <div id="lettersRoundInfoReveal" class="round-meta"></div>
+        <div id="lettersRevealInfo" class="phase-info"></div>
+        <div id="lettersRevealTable" class="letters-shared-table"></div>
+        <div id="lettersHostNextReveal" class="hidden" style="margin-top:14px;">
+            <button class="btn btn-primary" onclick="nextLettersPhase()">التالي</button>
+        </div>
+    </div>
+
+    <div id="screen-letters-voting" class="card hidden">
+        <div id="lettersRoundInfoVoting" class="round-meta"></div>
+        <div id="lettersTimerVoting" class="bluff-timer"></div>
+        <div id="lettersVotingInfo" class="phase-info"></div>
+        <div id="lettersVotingTable" class="letters-shared-table"></div>
+        <div id="lettersHostNextVoting" class="hidden" style="margin-top:14px;">
+            <button class="btn btn-primary" onclick="nextLettersPhase()">التالي</button>
+        </div>
+    </div>
+
+    <div id="screen-letters-result" class="card hidden">
+        <h2 style="color:var(--primary); text-align:center;">انتهت الجولة</h2>
+        <div id="lettersRoundResultInfo" class="phase-info"></div>
+        <div id="lettersResultTable" class="letters-shared-table"></div>
+        <div id="lettersHostNextResult" class="hidden" style="margin-top:14px;">
+            <button class="btn btn-primary" onclick="nextLettersPhase()">التالي</button>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="bluff-table">
+                <thead>
+                    <tr>
+                        <th>الترتيب</th>
+                        <th>اللاعب</th>
+                        <th>النقاط</th>
+                        <th>زيادة هذه الجولة</th>
+                    </tr>
+                </thead>
+                <tbody id="lettersRankingTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="screen-letters-finished" class="card hidden">
+        <h2 style="color:var(--primary)">انتهت اللعبة!</h2>
+        <div id="lettersFinalMsg" class="phase-info" style="font-size:20px; margin-bottom:20px;"></div>
+        <div id="lettersPodium" class="letters-podium"></div>
+
+        <div class="table-wrapper">
+            <table class="bluff-table">
+                <thead>
+                    <tr>
+                        <th>الترتيب</th>
+                        <th>اللاعب</th>
+                        <th>النقاط</th>
+                    </tr>
+                </thead>
+                <tbody id="lettersFinalScoreboard"></tbody>
+            </table>
+        </div>
+
+        <div id="lettersGameOverAdminArea" class="hidden">
+            <button class="btn btn-primary" onclick="restartLettersGame()">جولة جديدة بنفس اللاعبين</button>
+            <button class="btn" onclick="deleteLettersRoom()">حذف الغرفة</button>
+        </div>
+
+        <div id="lettersGameOverMemberArea" class="hidden">
+            <button class="btn" onclick="resetLettersAndExit()">خروج</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/letters.js"></script>
+{% endblock %}

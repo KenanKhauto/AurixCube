@@ -273,9 +273,13 @@
     filter: drop-shadow(0 0 12px rgba(255, 215, 80, 0.8));
 }
 
+.profile-trigger:active {
+    transform: scale(1.02);
+}
+
 .profile-dropdown-menu {
     position: absolute;
-    top: 100%;
+    top: calc(100% + 10px);
     right: 0;
     background: linear-gradient(180deg, rgba(22, 16, 10, 0.98), rgba(10, 8, 6, 0.98));
     border: 1px solid rgba(214, 176, 106, 0.28);
@@ -284,13 +288,15 @@
     min-width: 160px;
     z-index: 1000;
     opacity: 0;
-    transform: translateY(-10px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transform: translateY(-8px) scale(0.98);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    pointer-events: none;
 }
 
-.profile-dropdown-menu:not(.hidden) {
+.profile-dropdown-menu.is-open {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
 }
 
 .profile-dropdown-menu a {

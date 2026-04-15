@@ -8,7 +8,7 @@
     object-fit: contain;
     display: block;
     margin: 0 auto 12px;
-    filter: drop-shadow(0 0 8px rgba(255, 200, 80, 0.35));
+    filter: drop-shadow(0 0 8px var(--game-accent));
 }
 
 .draw-character-grid {
@@ -29,7 +29,7 @@
     height: 52px;
     object-fit: contain;
     flex-shrink: 0;
-    filter: drop-shadow(0 0 6px rgba(255, 200, 80, 0.2));
+    filter: drop-shadow(0 0 6px var(--game-accent));
 }
 
 .draw-player-text {
@@ -147,12 +147,12 @@
 }
 
 .draw-player-done-row {
-    background: rgba(255, 200, 80, 0.08);
+    background: rgba(214, 176, 106, 0.08);
 }
 
 .draw-player-current-row {
-    background: rgba(255, 200, 80, 0.14);
-    box-shadow: inset 3px 0 0 rgba(255, 200, 80, 0.75);
+    background: rgba(214, 176, 106, 0.14);
+    box-shadow: inset 3px 0 0 var(--game-accent);
 }
 
 
@@ -166,30 +166,30 @@
 
 .theme-draw-guess .draw-canvas-wrapper {
     background: linear-gradient(180deg, rgba(20, 20, 20, 0.96), rgba(10, 10, 10, 0.96));
-    border-color: rgba(222, 76, 57, 0.75);
-    box-shadow: 0 0 20px rgba(222, 76, 57, 0.18);
+    border-color: var(--game-accent);
+    box-shadow: 0 0 20px var(--game-shadow);
 }
 
 .theme-draw-guess .draw-word-hint {
     color: var(--game-accent);
-    text-shadow: 0 0 16px rgba(222, 76, 57, 0.35);
+    text-shadow: 0 0 16px var(--game-accent);
 }
 
 .theme-draw-guess .draw-tools-bar input,
 .theme-draw-guess .draw-tools-bar select {
     background: #111;
-    border-color: rgba(222, 76, 57, 0.22);
+    border-color: var(--game-accent-soft);
     color: #fff;
 }
 
 .theme-draw-guess .draw-guess-box {
     background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(222, 76, 57, 0.18);
+    border-color: var(--game-accent-soft);
 }
 
 .theme-draw-guess .draw-guess-feed {
     background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(222, 76, 57, 0.14);
+    border-color: var(--game-accent-soft);
 }
 
 .theme-draw-guess .draw-guess-message {
@@ -203,23 +203,23 @@
 }
 
 .theme-draw-guess .draw-guess-message.close {
-    background: rgba(255, 200, 80, 0.20);
-    border: 1px solid rgba(255, 200, 80, 0.40);
+    background: rgba(214, 176, 106, 0.20);
+    border: 1px solid rgba(214, 176, 106, 0.40);
     color: #fff;
 }
 
 .theme-draw-guess .draw-player-current-row {
-    background: rgba(222, 76, 57, 0.12);
-    box-shadow: inset 3px 0 0 rgba(222, 76, 57, 0.75);
+    background: rgba(214, 176, 106, 0.12);
+    box-shadow: inset 3px 0 0 var(--game-accent);
 }
 
 .theme-draw-guess .draw-player-done-row {
-    background: rgba(222, 76, 57, 0.08);
+    background: rgba(214, 176, 106, 0.08);
 }
 
 .theme-draw-guess .draw-character-preview,
 .theme-draw-guess .draw-player-avatar {
-    filter: drop-shadow(0 0 10px rgba(222, 76, 57, 0.28));
+    filter: drop-shadow(0 0 10px var(--game-accent));
 }
 
 
@@ -242,8 +242,8 @@
     background: linear-gradient(180deg, rgba(22, 22, 22, 0.96), rgba(12, 12, 12, 0.96));
     border-radius: 12px;
     overflow: hidden;
-    border: 2px solid rgba(222, 76, 57, 0.8);
-    box-shadow: 0 0 16px rgba(222, 76, 57, 0.14);
+    border: 2px solid var(--game-accent);
+    box-shadow: 0 0 16px var(--game-shadow);
 }
 
 @media (max-width: 900px) {

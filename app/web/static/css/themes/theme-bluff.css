@@ -1,17 +1,17 @@
 .theme-bluff {
-    --game-accent: #E6B657;
-    --game-accent-soft: rgba(230, 182, 87, 0.18);
-    --game-accent-strong: rgba(230, 182, 87, 0.30);
-    --game-shadow: 0 0 16px rgba(230, 182, 87, 0.24);
+    --game-accent: var(--brand-gold);
+    --game-accent-soft: rgba(214, 176, 106, 0.18);
+    --game-accent-strong: rgba(214, 176, 106, 0.30);
+    --game-shadow: 0 0 18px rgba(214, 176, 106, 0.18);
 
-    --error-bg: rgba(230, 182, 87, 0.08);
-    --error-border: rgba(230, 182, 87, 0.22);
+    --error-bg: rgba(214, 176, 106, 0.08);
+    --error-border: rgba(214, 176, 106, 0.22);
 }
 
 .theme-bluff .card {
-    border-color: var(--game-accent);
+    border-color: var(--border-strong);
 }
 
 .theme-bluff .game-header-logo {
-    filter: drop-shadow(0 0 10px rgba(230, 182, 87, 0.40));
+    filter: drop-shadow(0 0 10px rgba(214, 176, 106, 0.40));
 }

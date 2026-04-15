@@ -18,6 +18,15 @@
     --brand-gold-strong: #f0d18a;
     --brand-gold-deep: #8d6a31;
 
+    --game-accent: var(--brand-gold);
+    --game-accent-soft: rgba(214, 176, 106, 0.18);
+    --game-accent-strong: rgba(214, 176, 106, 0.30);
+    --game-shadow: 0 0 18px rgba(214, 176, 106, 0.18);
+    --primary: var(--brand-gold);
+    --glow: 0 0 18px rgba(214, 176, 106, 0.18);
+    --error-bg: rgba(214, 176, 106, 0.08);
+    --error-border: rgba(214, 176, 106, 0.22);
+
     --shadow-dark: 0 18px 40px rgba(0, 0, 0, 0.45);
     --shadow-gold: 0 0 18px rgba(214, 176, 106, 0.18);
     --shadow-inner: inset 0 1px 0 rgba(255, 230, 180, 0.05),

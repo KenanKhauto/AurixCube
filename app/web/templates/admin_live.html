@@ -41,6 +41,7 @@
                         <option value="who_am_i">من أنا</option>
                         <option value="draw_guess">ارسم وخمّن</option>
                         <option value="undercover">أندر كوفر</option>
+                        <option value="letters">حروف</option>
                     </select>
                 </div>
                 <div>
@@ -51,7 +52,12 @@
                         <option value="category_pick">اختيار التصنيف</option>
                         <option value="submission">إرسال الإجابات</option>
                         <option value="answer_pick">اختيار الإجابة</option>
+                        <option value="choosing_letter">اختيار الحرف</option>
+                        <option value="answering">كتابة الإجابات</option>
+                        <option value="reveal">كشف الإجابات</option>
+                        <option value="voting">التصويت</option>
                         <option value="round_result">نتيجة الجولة</option>
+                        <option value="finished">منتهية</option>
                         <option value="game_over">منتهية</option>
                     </select>
                 </div>
@@ -120,6 +126,7 @@
                         <option value="who_am_i">من أنا</option>
                         <option value="draw_guess">ارسم وخمّن</option>
                         <option value="undercover">أندر كوفر</option>
+                        <option value="letters">حروف</option>
                     </select>
                 </div>
                 <div>
@@ -309,6 +316,7 @@ function mapGameType(value) {
         who_am_i: "من أنا",
         draw_guess: "ارسم وخمّن",
         undercover: "أندر كوفر",
+        letters: "حروف",
     };
     return mapping[value] || value || "-";
 }
@@ -319,7 +327,12 @@ function mapPhase(value) {
         category_pick: "اختيار التصنيف",
         submission: "إرسال الإجابات",
         answer_pick: "اختيار الإجابة",
+        choosing_letter: "اختيار الحرف",
+        answering: "كتابة الإجابات",
+        reveal: "كشف الإجابات",
+        voting: "التصويت",
         round_result: "نتيجة الجولة",
+        finished: "منتهية",
         game_over: "منتهية",
     };
     return mapping[value] || value || "-";

@@ -41,8 +41,8 @@
 }
 
 .card.glow-border {
-    border: 1px solid var(--game-accent);
-    box-shadow: var(--game-shadow);
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-dark);
 }
 
 /* ================= BUTTONS ================= */

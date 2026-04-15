@@ -22,11 +22,13 @@ from app.db.models.user import User
 from app.db.session import get_db
 from app.games.bluff.service import BluffGameService
 from app.games.draw_guess.service import DrawGuessGameService
+from app.games.letters.service import LettersGameService
 from app.games.registry import GAMES
 from app.games.undercover.service import UndercoverGameService
 from app.games.who_am_i.service import WhoAmIService
 from app.games.bluff.websocket_manager import manager as bluff_ws_manager
 from app.games.draw_guess.websocket_manager import manager as draw_ws_manager
+from app.games.letters.websocket_manager import manager as letters_ws_manager
 from app.games.who_am_i.websocket_manager import manager as who_am_i_ws_manager
 from app.services.room_storage import get_room_repository
 
@@ -201,6 +203,25 @@ def draw_guess_page(
     )
 
 
+@router.get("/games/letters")
+def letters_page(
+    request: Request,
+    current_user: User | None = Depends(get_current_user_optional),
+):
+    """Render the letters game page."""
+    game = next((game for game in GAMES if game["path"] == "/games/letters"), {})
+
+    return templates.TemplateResponse(
+        request,
+        "letters.html",
+        {
+            "request": request,
+            "current_user": current_user,
+            "theme_class": game.get("theme_class", ""),
+        },
+    )
+
+
 def _infer_game_type(room_data: dict) -> str:
     game_type = room_data.get("game_type")
     if isinstance(game_type, str) and game_type:
@@ -212,6 +233,8 @@ def _infer_game_type(room_data: dict) -> str:
         return "who_am_i"
     if "drawer_order" in room_data or "current_drawer_id" in room_data:
         return "draw_guess"
+    if "used_letters" in room_data and "active_categories" in room_data:
+        return "letters"
     if "answer_options" in room_data and "total_rounds" in room_data:
         return "bluff"
     return "unknown"
@@ -237,7 +260,7 @@ def _build_live_room_snapshot() -> dict:
             storage_prefix, room_code = storage_room_code.split(":", 1)
 
         inferred_game_type = _infer_game_type(room_data)
-        if inferred_game_type == "unknown" and storage_prefix in {"bluff", "draw_guess", "who_am_i", "undercover"}:
+        if inferred_game_type == "unknown" and storage_prefix in {"bluff", "draw_guess", "who_am_i", "undercover", "letters"}:
             inferred_game_type = storage_prefix
 
         players = list((room_data.get("players") or {}).values())
@@ -262,6 +285,7 @@ def _build_live_room_snapshot() -> dict:
         sum(len(room_connections) for room_connections in draw_ws_manager.rooms.values())
         + sum(len(room_connections) for room_connections in bluff_ws_manager.rooms.values())
         + sum(len(room_connections) for room_connections in who_am_i_ws_manager.rooms.values())
+        + sum(len(room_connections) for room_connections in letters_ws_manager.rooms.values())
     )
 
     return {
@@ -337,7 +361,7 @@ def _sort_live_rooms(
 def _delete_room_as_admin(game_type: str, room_code: str) -> None:
     game_type = (game_type or "").strip()
     room_code = (room_code or "").strip().upper()
-    if game_type not in {"bluff", "draw_guess", "who_am_i", "undercover"}:
+    if game_type not in {"bluff", "draw_guess", "who_am_i", "undercover", "letters"}:
         raise HTTPException(status_code=400, detail="Unsupported game type.")
 
     scoped_repo = get_room_repository(game_type)
@@ -355,6 +379,8 @@ def _delete_room_as_admin(game_type: str, room_code: str) -> None:
         DrawGuessGameService().delete_room(room_code, str(host_id))
     elif game_type == "who_am_i":
         WhoAmIService().delete_room(room_code, str(host_id))
+    elif game_type == "letters":
+        LettersGameService().delete_room(room_code, str(host_id))
     else:
         UndercoverGameService().delete_room(room_code, str(host_id))
 

@@ -22,6 +22,7 @@ GAME_INVITE_PATHS = {
     "who_am_i": "/games/who-am-i",
     "undercover": "/games/undercover",
     "draw_guess": "/games/draw-guess",
+    "letters": "/games/letters",
 }
 
 

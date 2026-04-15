@@ -44,5 +44,16 @@ GAMES = [
         "outline_class": "game-outline-draw-guess",
         "theme_class": "theme-draw-guess",
         "logo": "/static/images/draw_guess-logo.png",
+    },
+    {
+        "id": "letters",
+        "name": "حروف",
+        "description": "لعبة جماعية تختار فيها حرفًا وتملأ التصنيفات ثم تصوّت على صحة الإجابات.",
+        "path": "/games/letters",
+        "coming_soon": False,
+        "disabled": False,
+        "outline_class": "game-outline-bluff",
+        "theme_class": "theme-letters",
+        "logo": "/static/images/games-logo.png",
     }
 ]
