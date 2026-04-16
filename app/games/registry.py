@@ -54,6 +54,6 @@ GAMES = [
         "disabled": False,
         "outline_class": "game-outline-bluff",
         "theme_class": "theme-letters",
-        "logo": "/static/images/games-logo.png",
+        "logo": "/static/images/letters-logo.png",
     }
 ]
